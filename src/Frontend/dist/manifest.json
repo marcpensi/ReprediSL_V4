@@ -1,0 +1,23 @@
+{
+  "short_name": "ReprediSL V4",
+  "name": "ReprediSL Comercial â€” GestiÃ³n de Clientes y Pedidos",
+  "description": "Plataforma Comercial de GestiÃ³n de Clientes, Pedidos y PDF en Movilidad Offline-First",
+  "icons": [
+    {
+      "src": "assets/repredisl-logo.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "assets/repredisl-logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#121212",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait"
+}

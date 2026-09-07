@@ -1,3 +1,29 @@
-<!doctype html><html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#ffffff"/><title>REPREDISL Comercial</title>  <script type="module" crossorigin src="/assets/index-BTt6gwjK.js"></script>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#0f172a"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="ReprediSL V4"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/assets/repredisl-logo.png"/>
+  <link rel="icon" type="image/png" href="/assets/repredisl-logo.png"/>
+  <title>REPREDISL V4 â€” Fuerza de Ventas Comercial</title>
+  <script type="module" crossorigin src="/assets/index-BTt6gwjK.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-B7LPl7hc.css">
-</head><body><div id="root"></div></body></html>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('ServiceWorker registrado con Ã©xito:', reg.scope))
+          .catch((err) => console.warn('ServiceWorker no pudo registrarse:', err));
+      });
+    }
+  </script>
+</body>
+</html>
