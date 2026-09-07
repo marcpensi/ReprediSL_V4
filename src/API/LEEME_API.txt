@@ -1,0 +1,49 @@
+REPREDISL - API
+==============
+
+Dominio previsto:
+  https://api.repredisl.com
+
+ESTE ZIP ES PARA EL PC/SERVIDOR WINDOWS DONDE ESTAN
+POSTGRESQL Y POSTGREST.
+
+NO SUBAS postgrest.exe A public_html DE HOSTINGER.
+
+ARCHIVOS:
+- postgrest.exe
+- postgrest.conf
+- ARRANCAR_POSTGREST.bat
+- PROBAR_API_LOCAL.bat
+- ABRIR_FIREWALL_HTTPS.bat
+- Caddyfile
+
+FUNCIONAMIENTO:
+  api.repredisl.com
+          |
+       HTTPS 443
+          |
+        Caddy
+          |
+   127.0.0.1:3000
+          |
+      PostgREST
+          |
+      PostgreSQL
+
+PASOS INICIALES:
+1. Copia esta carpeta, por ejemplo, a C:\REPREDISL_API
+2. Ejecuta ARRANCAR_POSTGREST.bat
+3. Ejecuta PROBAR_API_LOCAL.bat
+4. Cuando eso funcione, configura Caddy con el Caddyfile incluido.
+5. api.repredisl.com deberá apuntar por DNS a la IP pública
+   del lugar donde está este servidor.
+
+SEGURIDAD:
+- PostgREST escucha solo en 127.0.0.1:3000.
+- El navegador entra por HTTPS 443 mediante Caddy.
+- CORS solo permite https://pedidos.repredisl.com
+
+NOTA IMPORTANTE:
+La contraseña PostgreSQL está actualmente escrita en postgrest.conf
+porque es la configuración que estabas usando. Conviene cambiarla
+antes de dejar la API publicada en Internet.

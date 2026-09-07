@@ -1,0 +1,22 @@
+REPREDISL - CLIENTES CORREGIDOS
+
+1. Al abrir la app:
+   - muestra inmediatamente clientes guardados en IndexedDB si existen;
+   - consulta la API;
+   - carga solo 30 clientes;
+   - guarda esos 30 en IndexedDB.
+
+2. Si no hay Internet:
+   - mantiene los clientes de IndexedDB.
+
+3. Búsqueda:
+   - con 2 o más caracteres consulta PostgREST bajo demanda;
+   - no descarga todos los clientes.
+
+4. Sincronizar:
+   - SIEMPRE contacta con la API;
+   - actualiza los 30 clientes iniciales;
+   - también refresca los clientes ya almacenados en IndexedDB.
+
+5. Se corrige el campo real de PostgREST:
+   nombre_comercial

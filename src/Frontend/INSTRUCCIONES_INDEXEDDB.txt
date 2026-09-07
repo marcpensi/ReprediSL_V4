@@ -1,0 +1,51 @@
+REPREDISL - CLIENTES POSTGREST + INDEXEDDB
+=========================================
+
+CAMBIOS DE ESTA VERSION
+-----------------------
+1. Al arrancar NO descarga todos los clientes de PostgreSQL.
+2. La caché persistente del navegador se guarda en IndexedDB (base REPREDISL).
+3. Con el buscador vacío se muestran como máximo los últimos 30 clientes ya guardados en caché.
+4. Al escribir 1 carácter solo se consulta la caché local.
+5. Al escribir 2 o más caracteres:
+   - se muestran primero coincidencias de IndexedDB;
+   - se espera 300 ms para evitar consultas por cada pulsación;
+   - se consulta PostgREST;
+   - PostgREST devuelve como máximo 30 clientes;
+   - esos clientes se guardan/actualizan en IndexedDB.
+6. La caché conserva como máximo 300 clientes y persiste al cerrar el navegador.
+7. Si PostgREST no responde, se mantienen los resultados disponibles en caché.
+8. En Config hay un botón "Vaciar caché de clientes".
+
+API
+---
+Por defecto:
+http://127.0.0.1:3000
+
+Puedes cambiarla creando un archivo .env en la raíz:
+VITE_API_URL=http://IP_DEL_SERVIDOR:3000
+
+Para producción en pedidos.repredisl.com, si configuramos el proxy /api:
+VITE_API_URL=/api
+
+BUSQUEDA POSTGREST
+------------------
+La búsqueda usa los campos actuales de la vista/tabla clientes:
+- nombre
+- nombrecomercial
+- nif
+- id_cliente (cuando se escribe un código numérico)
+
+Límite por consulta: 30.
+
+INSTALACION
+-----------
+En Windows, desde la carpeta del proyecto:
+
+npm install
+npm run dev
+
+O ejecuta ejecutar.bat.
+
+
+CAMBIO: Configuración incluye ahora 'Sincronizar clientes', que actualiza únicamente los clientes ya presentes en IndexedDB. 'Vaciar caché' sigue disponible y borra todos los clientes locales.

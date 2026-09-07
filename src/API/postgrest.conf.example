@@ -1,0 +1,11 @@
+# Archivo de plantilla para PostgREST - REPREDISL V3
+# Reemplazar TU_PASSWORD_AQUI con la contraseña real en postgrest.conf (fuera de control de versiones)
+
+db-uri = "postgres://authenticator:TU_PASSWORD_AQUI@localhost:5432/repredisl"
+db-schemas = "api"
+db-anon-role = "web_anon"
+
+server-host = "127.0.0.1"
+server-port = 3000
+
+server-cors-allowed-origins = "https://pedidos.repredisl.com"

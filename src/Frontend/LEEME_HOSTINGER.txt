@@ -1,0 +1,24 @@
+REPREDISL - PEDIDOS
+==================
+
+Dominio:
+  https://pedidos.repredisl.com
+
+API configurada:
+  https://api.repredisl.com
+
+PASOS:
+1. Descomprime este ZIP en tu PC.
+2. Ejecuta BUILD_PRODUCCION.bat.
+3. Se creará la carpeta dist.
+4. En Hostinger abre el public_html de pedidos.repredisl.com.
+5. Borra la versión anterior (haz copia antes).
+6. Sube EL CONTENIDO de dist:
+     index.html
+     assets         ...
+   No subas la carpeta dist como una carpeta adicional.
+
+IMPORTANTE:
+- Esta versión usa IndexedDB para caché de clientes.
+- Los clientes se buscan bajo demanda.
+- La API de producción queda fijada por .env.production.
