@@ -1,4 +1,5 @@
-﻿# Informe de consolidaciÃ³n
+# Informe de consolidació
+
 
 ## Destino
 
@@ -6,9 +7,9 @@ D:\programacio\repredi\ReprediSL_V4
 
 ## Regla fundamental
 
-LOS ORÃGENES SON SIEMPRE DE SOLO LECTURA. Nunca borrar, modificar, renombrar o mover archivos origen.
+LOS ORÍGENES SON SIEMPRE DE SOLO LECTURA. Nunca borrar, modificar, renombrar o mover archivos origen.
 
-## OrÃ­genes analizados
+## OrÍgenes analizados
 - D:\programacio\repredi\ReprediSL_V3 (8645 archivos detectados)
 
 ## Estado
