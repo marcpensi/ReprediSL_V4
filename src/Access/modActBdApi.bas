@@ -48,7 +48,7 @@ Public Function ExportarTablas() As Boolean
 
     On Error GoTo Err_Handler
 
-    RegistrarLogSync "DEBUG STEP 2: Manejador de errores configurado"
+    RegistrarLogSync "DEBUG STEP 2: Proteccion contra fallos configurada"
     
     ' 1. Asegurar que las consultas y campos necesarios existan en Access
     RegistrarLogSync "DEBUG STEP 3: ActualizarEstructuraAccess..."
