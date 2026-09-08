@@ -1,6 +1,7 @@
 const DB_NAME = 'REPREDISL';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'clientes';
+const PRODUCTS_STORE = 'productos';
 const MAX_CACHE = 300;
 
 function openDb() {
@@ -11,6 +12,10 @@ function openDb() {
       if (!db.objectStoreNames.contains(STORE)) {
         const store = db.createObjectStore(STORE, {keyPath: 'code'});
         store.createIndex('cachedAt', 'cachedAt');
+      }
+      if (!db.objectStoreNames.contains(PRODUCTS_STORE)) {
+        const pStore = db.createObjectStore(PRODUCTS_STORE, {keyPath: 'code'});
+        pStore.createIndex('cachedAt', 'cachedAt');
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -100,3 +105,44 @@ export async function clearClientCache() {
   });
   db.close();
 }
+
+export async function cacheProducts(products) {
+  if (!Array.isArray(products) || products.length === 0) return;
+  const db = await openDb();
+  const now = Date.now();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(PRODUCTS_STORE, 'readwrite');
+    const store = tx.objectStore(PRODUCTS_STORE);
+    products.filter(p => p?.code).forEach(p => store.put({...p, cachedAt: now}));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function allCachedProducts() {
+  const db = await openDb();
+  try {
+    const tx = db.transaction(PRODUCTS_STORE, 'readonly');
+    return await requestToPromise(tx.objectStore(PRODUCTS_STORE).getAll());
+  } catch (err) {
+    console.error('Error leyendo productos de IndexedDB:', err);
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+export async function clearProductCache() {
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(PRODUCTS_STORE, 'readwrite');
+    tx.objectStore(PRODUCTS_STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+}
+

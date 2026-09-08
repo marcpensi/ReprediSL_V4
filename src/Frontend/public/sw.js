@@ -1,4 +1,4 @@
-const CACHE_NAME = 'repredisl-v4-cache-v1';
+const CACHE_NAME = 'repredisl-v4-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -6,13 +6,13 @@ const ASSETS_TO_CACHE = [
   './src/styles.css',
   './src/db.js',
   './src/clientApi.js',
-  './src/assets/repredisl-logo.png'
+  './assets/repredisl-logo.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
+      return cache.addAll(ASSETS_TO_CACHE).catch((err) => console.warn('Error precaching assets:', err));
     })
   );
   self.skipWaiting();
@@ -34,7 +34,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/api/') || event.request.url.includes('postgrest')) {
+  if (event.request.url.includes('/api/') || event.request.url.includes('postgrest') || event.request.url.includes('3000')) {
     return;
   }
 

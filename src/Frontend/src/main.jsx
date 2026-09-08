@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import logo from './assets/repredisl-logo.png';
-import {allCachedClients, cacheClient, cacheClients, clearClientCache, recentCachedClients, searchCachedClients} from './db';
-import {API_URL, loadInitialClientsApi, searchClientsApi, syncCachedClientsApi} from './clientApi';
+import {allCachedClients, cacheClient, cacheClients, clearClientCache, recentCachedClients, searchCachedClients, allCachedProducts, cacheProducts, clearProductCache} from './db';
+import {API_URL, loadInitialClientsApi, searchClientsApi, syncCachedClientsApi, loadProductsApi, loadTarifasApi} from './clientApi';
 
 const SELLERS=[
   {code:1,name:'Axa',series:'V1'},{code:2,name:'Fábrica 2',series:'V2'},{code:3,name:'Fábrica 3',series:'V3'},
@@ -152,7 +152,7 @@ function downloadPdf(order,client,total){const doc=buildPdf(order,client,total);
 
 function App(){
  const [tab,setTab]=useState('clients');
- const [online,setOnline]=useState(true);
+ const [online,setOnline]=useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
  const [seller,setSeller]=useState(SELLERS[12]);
  const [clients,setClients]=useState([]);
  const [screen,setScreen]=useState('clients');
@@ -170,6 +170,17 @@ function App(){
  const [draft,setDraft]=useState(null);
  const [modalProduct,setModalProduct]=useState(null);
  const [viewOrder,setViewOrder]=useState(null);
+
+ useEffect(()=>{
+   const handleOnline=()=>setOnline(true);
+   const handleOffline=()=>setOnline(false);
+   window.addEventListener('online',handleOnline);
+   window.addEventListener('offline',handleOffline);
+   return ()=>{
+     window.removeEventListener('online',handleOnline);
+     window.removeEventListener('offline',handleOffline);
+   };
+ },[]);
 
  useEffect(()=>{
    let cancelled=false;

@@ -1,4 +1,4 @@
-export const API_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+export const API_URL = (import.meta.env?.VITE_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 const CLIENT_LIMIT = 30;
 
 function apiValue(row, ...names) {
@@ -114,3 +114,43 @@ export async function syncCachedClientsApi(codes, {signal} = {}) {
   }
   return result;
 }
+
+export function normalizeProduct(row) {
+  const code = String(apiValue(row, 'codigo', 'id_producto', 'code', 'id') ?? '').trim();
+  const name = String(apiValue(row, 'nombre', 'descripcion', 'name') ?? '').trim();
+  const priceVal = apiValue(row, 'precio_venta', 'precio', 'price');
+  const price = priceVal !== '' && priceVal !== null && priceVal !== undefined ? Number(priceVal) : 0;
+  const boxVal = apiValue(row, 'unidades_caja', 'caja', 'box');
+  const box = boxVal !== '' && boxVal !== null && boxVal !== undefined ? Number(boxVal) : 24;
+  const defaultQty = apiValue(row, 'defaultqty', 'cantidad_defecto') ? Number(apiValue(row, 'defaultqty')) : (box || null);
+  const stockVal = apiValue(row, 'stock', 'existencias');
+  const stock = stockVal !== '' && stockVal !== null && stockVal !== undefined ? Number(stockVal) : 100;
+
+  return {
+    code: code || `PROD_${Math.random().toString(36).substring(2, 7)}`,
+    name: name || `Producto ${code}`,
+    price: isNaN(price) ? 0 : price,
+    box: isNaN(box) || box <= 0 ? 24 : box,
+    defaultQty,
+    stock: isNaN(stock) ? 0 : stock
+  };
+}
+
+export async function loadProductsApi({signal} = {}) {
+  const url = `${API_URL}/productos?order=codigo.asc&limit=100`;
+  const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  if (!Array.isArray(data)) throw new Error('La API no ha devuelto una lista de productos');
+  return data.map(normalizeProduct).filter(p => p.code);
+}
+
+export async function loadTarifasApi(idTarifa, {signal} = {}) {
+  if (!idTarifa) return [];
+  const url = `${API_URL}/tarifas?id_tarifa=eq.${encodeURIComponent(idTarifa)}`;
+  const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
