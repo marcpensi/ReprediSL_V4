@@ -95,7 +95,7 @@ namespace ReprediTrayDaemon
                 Cursor = Cursors.Hand
             };
             btnAck.FlatAppearance.BorderSize = 0;
-            btnAck.Click += (s, e) => MessageBox.Show("No hay pedidos pendientes de confirmacion.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            btnAck.Click += (s, e) => MessageBox.Show("No hay pedidos pendientes de confirmación.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             // 2. Boton Conmutar Auto-Aceptar
             btnAutoToggle = new Button
@@ -239,7 +239,7 @@ namespace ReprediTrayDaemon
                 ReadOnly = true,
                 BackColor = Color.FromArgb(12, 13, 15),
                 ForeColor = Color.FromArgb(53, 189, 105),
-                Font = new Font("Consolas", 12F, FontStyle.Bold),
+                Font = new Font("Consolas", 12.5F, FontStyle.Bold),
                 BorderStyle = BorderStyle.None,
                 Padding = new Padding(10)
             };
@@ -247,11 +247,52 @@ namespace ReprediTrayDaemon
             this.Controls.Add(txtLog);
             this.Controls.Add(pnlTop);
 
-            // Menu Tray Icon
-            trayMenu = new ContextMenuStrip();
-            trayMenu.Items.Add("🖥️ Abrir Monitoreo Visual", null, (s, e) => ShowForm());
-            trayMenu.Items.Add("⚡ Sincronizar PostgreSQL Ahora", null, async (s, e) => await DoManualSyncAsync());
-            trayMenu.Items.Add("🚨 Ver Registro de Errores", null, (s, e) => MostrarVentanaErrores());
+            // Menu Contextual Completo de la Bandeja de Sistema (Boton Derecho en Icono de Reloj)
+            trayMenu = new ContextMenuStrip
+            {
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Regular)
+            };
+
+            trayMenu.Items.Add("🖥️ Ver Registro / Log en Vivo", null, (s, e) => ShowForm());
+            trayMenu.Items.Add("⚡ Ejecutar Sincronización Ahora", null, async (s, e) => await DoManualSyncAsync());
+            trayMenu.Items.Add("-");
+            trayMenu.Items.Add("🟢 Gestionar / Aceptar Pedidos Pendientes", null, (s, e) => MessageBox.Show("No hay pedidos pendientes de confirmación.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information));
+            trayMenu.Items.Add("⚙️ Alternar Modo Auto-Aceptar", null, (s, e) => ToggleAutoAcceptMode());
+            trayMenu.Items.Add("🚨 Ver Log Especial de Errores (sync_errors.log)", null, (s, e) => MostrarVentanaErrores());
+            trayMenu.Items.Add("-");
+            trayMenu.Items.Add("💾 Exportar Registro (Guardar como...)", null, (s, e) => ExportarRegistro());
+            trayMenu.Items.Add("🖨️ Imprimir Registro", null, (s, e) => ImprimirRegistro());
+            trayMenu.Items.Add("🗑️ Limpiar Registro (Con Copia de Seg.)", null, (s, e) => LimpiarRegistroConConfirmacion());
+
+            // Submenu Tamaño de Letra / Interfaz
+            var itemSizeMenu = new ToolStripMenuItem("🔤 Tamaño de Letra / Interfaz");
+            itemSizeMenu.DropDownItems.Add("Pequeño (100%)", null, (s, e) => ApplyFontSize("Pequeno"));
+            itemSizeMenu.DropDownItems.Add("Mediano (125%)", null, (s, e) => ApplyFontSize("Mediano"));
+            itemSizeMenu.DropDownItems.Add("Grande (150%)", null, (s, e) => ApplyFontSize("Grande"));
+            trayMenu.Items.Add(itemSizeMenu);
+
+            trayMenu.Items.Add("-");
+
+            // Submenu de Pruebas y Simulaciones
+            var itemSimMenu = new ToolStripMenuItem("🧪 Pruebas y Simulaciones");
+            itemSimMenu.DropDownItems.Add("📦 Simular Llegada de Pedido (Prueba)", null, (s, e) =>
+            {
+                syncService.AppendLog("[NUEVO PEDIDO] Recibido pedido N. TEST-001 | Cliente: 1001 (CLIENTE DE PRUEBA SL) | Importe: 450,00 EUR", DbSyncService.LogLevel.Success);
+                MessageBox.Show("Simulación de llegada de pedido registrada en el log.", "Prueba de Demonio", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            });
+            itemSimMenu.DropDownItems.Add("🚨 Simular Error de Sync (Prueba Alerta Rojo)", null, (s, e) =>
+            {
+                syncService.AppendLog("[ERROR] Fallo de prueba simulado: Conexión intermitente con la base de datos.", DbSyncService.LogLevel.Error);
+            });
+            itemSimMenu.DropDownItems.Add("💥 Simular Ráfaga de Errores (Prueba Incremento Rápido)", null, (s, e) =>
+            {
+                for (int i = 1; i <= 4; i++)
+                {
+                    syncService.AppendLog($"[ERROR] Ráfaga de incidencia #{i}: Simulación de fallo en lote {i * 500}", DbSyncService.LogLevel.Error);
+                }
+            });
+            trayMenu.Items.Add(itemSimMenu);
+
             trayMenu.Items.Add("-");
             trayMenu.Items.Add("❌ Salir del Demonio", null, (s, e) => ExitApplication());
 
@@ -276,9 +317,9 @@ namespace ReprediTrayDaemon
         private void ApplyFontSize(string size)
         {
             currentFontSize = size;
-            GuardarConfiguracionUI(size);
+            GuardarConfiguracionUI();
 
-            float logFontSize = 12f;
+            float logFontSize = 12.5f;
             float btnFontSize = 10f;
             float statusFontSize = 10.5f;
             float targetFontSize = 12.5f;
@@ -342,20 +383,28 @@ namespace ReprediTrayDaemon
                 {
                     string json = File.ReadAllText(settingsFilePath);
                     using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("TamanoFuente", out var elem))
+                    if (doc.RootElement.TryGetProperty("TamanoFuente", out var elemFuente))
                     {
-                        currentFontSize = elem.GetString() ?? "Grande";
+                        currentFontSize = elemFuente.GetString() ?? "Grande";
+                    }
+                    if (doc.RootElement.TryGetProperty("AutoAceptar", out var elemAuto))
+                    {
+                        autoAcceptMode = elemAuto.GetBoolean();
                     }
                 }
             }
             catch { }
         }
 
-        private void GuardarConfiguracionUI(string size)
+        private void GuardarConfiguracionUI()
         {
             try
             {
-                var data = new { TamanoFuente = size };
+                var data = new
+                {
+                    TamanoFuente = currentFontSize,
+                    AutoAceptar = autoAcceptMode
+                };
                 string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(settingsFilePath, json);
             }
@@ -365,15 +414,19 @@ namespace ReprediTrayDaemon
         private void ToggleAutoAcceptMode()
         {
             autoAcceptMode = !autoAcceptMode;
+            GuardarConfiguracionUI();
+
             if (autoAcceptMode)
             {
-                btnAutoToggle.Text = "Modo: AUTO-ACEPTAR";
-                btnAutoToggle.BackColor = Color.FromArgb(38, 140, 75);
+                btnAutoToggle.Text = "Modo: AUTO-ACEPTAR ACTIVO";
+                btnAutoToggle.BackColor = Color.FromArgb(30, 120, 180);
+                syncService.AppendLog("[CONFIG] Auto-aceptacion de pedidos ACTIVADA.", DbSyncService.LogLevel.Info);
             }
             else
             {
                 btnAutoToggle.Text = "Modo: CONFIRMACION MANUAL";
                 btnAutoToggle.BackColor = Color.FromArgb(50, 60, 80);
+                syncService.AppendLog("[CONFIG] Auto-aceptacion de pedidos DESACTIVADA (Modo Confirmacion Manual).", DbSyncService.LogLevel.Info);
             }
         }
 
@@ -381,6 +434,17 @@ namespace ReprediTrayDaemon
         {
             lblPendientes.Text = "Sin pedidos pendientes";
             lblPendientes.ForeColor = Color.FromArgb(220, 220, 220);
+
+            if (autoAcceptMode)
+            {
+                btnAutoToggle.Text = "Modo: AUTO-ACEPTAR ACTIVO";
+                btnAutoToggle.BackColor = Color.FromArgb(30, 120, 180);
+            }
+            else
+            {
+                btnAutoToggle.Text = "Modo: CONFIRMACION MANUAL";
+                btnAutoToggle.BackColor = Color.FromArgb(50, 60, 80);
+            }
 
             if (syncService.ErrorCount > 0)
             {
