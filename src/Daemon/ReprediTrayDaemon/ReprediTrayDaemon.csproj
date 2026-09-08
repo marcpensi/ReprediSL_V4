@@ -8,6 +8,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyTitle>ReprediSL V4 Tray Daemon</AssemblyTitle>
     <Product>ReprediSL V4</Product>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <OutputPath>..\bin\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="MainForm.cs" />
+    <Compile Include="Services\**\*.cs" />
+  </ItemGroup>
 
 </Project>

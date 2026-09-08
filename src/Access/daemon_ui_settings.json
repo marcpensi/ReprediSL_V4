@@ -1,3 +1,5 @@
 {
-    "TamanoFuente":  "Grande"
+  "TamanoFuente": "Grande",
+  "AutoAceptar": true,
+  "TemaInterfaz": "Claro"
 }
