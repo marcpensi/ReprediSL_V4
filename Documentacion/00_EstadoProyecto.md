@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
 **Fecha de actualización:** 08-09-2026  
-**Versión:** 4.1.1  
-**Estado General:** Estable y Operativo (Consolidación V4.1.1 - Demonio Nativo C# .NET 10 OutputPath & UI Refinements)
+**Versión:** 4.1.2  
+**Estado General:** Estable y Operativo (Consolidación V4.1.2 - Demonio Nativo C# .NET 10 Responsive UI & 3D Interactive Buttons)
 
 ---
 

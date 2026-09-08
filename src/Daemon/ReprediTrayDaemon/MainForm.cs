@@ -308,7 +308,15 @@ namespace ReprediTrayDaemon
             // Tarjeta 3: Ruta Target ERP PsGest (Ocupa las 2 columnas)
             cardRutaTarget = CreateRoundedCard(48);
             var iconCard3 = new Label { Text = "🗄️", Font = new Font("Segoe UI Emoji", 12F), AutoSize = true, Location = new Point(12, 12) };
-            lblRutaTargetText = new Label { Text = "Destino ERP PsGest: ", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), AutoSize = true, Location = new Point(40, 13) };
+            lblRutaTargetText = new Label
+            {
+                Text = "Destino ERP PsGest: ",
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                AutoSize = false,
+                Location = new Point(40, 13),
+                Size = new Size(600, 20),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
 
             btnCopyPath = new Button
             {
@@ -617,25 +625,65 @@ namespace ReprediTrayDaemon
             var btn = new Button
             {
                 Text = text,
-                Size = new Size(width, 40),
+                Size = new Size(width, 44),
                 Margin = new Padding(0, 0, 8, 8),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = baseColor,
                 ForeColor = Color.White,
                 Cursor = Cursors.Hand,
-                Font = new Font("Segoe UI", 9.25F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 UseVisualStyleBackColor = false
             };
-            btn.FlatAppearance.BorderSize = 0;
-            btn.Click += onClick;
+
+            // Borde sutil para dar profundidad
+            btn.FlatAppearance.BorderSize = 2;
+            btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
+
+            // Efecto de sombra simulado con borde inferior más oscuro
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(
+                Math.Min(255, baseColor.R + 20),
+                Math.Min(255, baseColor.G + 20),
+                Math.Min(255, baseColor.B + 20)
+            );
 
             Color hoverColor = Color.FromArgb(
-                Math.Min(255, baseColor.R + 25),
-                Math.Min(255, baseColor.G + 25),
-                Math.Min(255, baseColor.B + 25)
+                Math.Min(255, baseColor.R + 30),
+                Math.Min(255, baseColor.G + 30),
+                Math.Min(255, baseColor.B + 30)
             );
-            btn.MouseEnter += (s, e) => btn.BackColor = hoverColor;
-            btn.MouseLeave += (s, e) => btn.BackColor = baseColor;
+
+            Color pressedColor = Color.FromArgb(
+                Math.Max(0, baseColor.R - 20),
+                Math.Max(0, baseColor.G - 20),
+                Math.Max(0, baseColor.B - 20)
+            );
+
+            btn.MouseEnter += (s, e) =>
+            {
+                btn.BackColor = hoverColor;
+                btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
+            };
+
+            btn.MouseLeave += (s, e) =>
+            {
+                btn.BackColor = baseColor;
+                btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
+            };
+
+            btn.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    btn.BackColor = pressedColor;
+                    btn.FlatAppearance.BorderColor = ControlPaint.Dark(pressedColor, 0.3f);
+                }
+            };
+
+            btn.MouseUp += (s, e) =>
+            {
+                btn.BackColor = hoverColor;
+                btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
+            };
 
             return btn;
         }
@@ -684,6 +732,13 @@ namespace ReprediTrayDaemon
             if (btnCopyPath != null && cardRutaTarget != null)
             {
                 btnCopyPath.Location = new Point(cardRutaTarget.ClientSize.Width - 42, 6);
+
+                // Ajustar el ancho del label de ruta para que llegue hasta el botón
+                if (lblRutaTargetText != null)
+                {
+                    int availableWidth = cardRutaTarget.ClientSize.Width - 50 - btnCopyPath.Width;
+                    lblRutaTargetText.Size = new Size(Math.Max(availableWidth, 400), lblRutaTargetText.Height);
+                }
             }
             if (lblStatusClock != null && pnlStatusBar != null)
             {
@@ -968,6 +1023,13 @@ namespace ReprediTrayDaemon
             }
 
             lblRutaTargetText.Text = "Destino ERP PsGest: " + syncService.MdbPath;
+
+            // Ajustar el ancho del label para que llegue hasta el final
+            if (cardRutaTarget != null && btnCopyPath != null)
+            {
+                int availableWidth = cardRutaTarget.ClientSize.Width - 50 - btnCopyPath.Width;
+                lblRutaTargetText.Size = new Size(Math.Max(availableWidth, 400), lblRutaTargetText.Height);
+            }
         }
 
         private void SyncService_OnLogMessage(string message, DbSyncService.LogLevel level)
