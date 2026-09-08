@@ -12,3 +12,4 @@ Este directorio contiene la documentación técnica y funcional oficial del proy
 - [`05_Despliegue.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/05_Despliegue.md): Instrucciones de despliegue para producción (Hostinger, Caddy, PostgREST).
 - [`06_Pruebas.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/06_Pruebas.md): Resultados de verificación de build y plan de pruebas automatizadas.
 - [`07_Incidencias.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/07_Incidencias.md): Registro de diagnóstico, causas y soluciones de incidencias.
+- [`RESUMEN_NOTEBOOKLM_PSAGENTS.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/05_AgentesIA/RESUMEN_NOTEBOOKLM_PSAGENTS.md): Resumen técnico de la arquitectura PsAgents optimizado para NotebookLM.
