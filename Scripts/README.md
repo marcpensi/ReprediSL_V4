@@ -5,35 +5,37 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 ## Categorías
 - **Bootstrap:** Scripts de inicialización del entorno.
 - **Desarrollo:** Scripts para ejecución y prueba local.
-- **BaseDatos:** Scripts de gestión de esquemas SQL y migraciones desde Access.
+- **BaseDatos:** Scripts de gestión de esquemas SQL y exportación desde Access.
 - **Migracion:** Utilidades de migración de datos.
 - **Despliegue:** Scripts de empaquetado y despliegue a producción.
 - **Mantenimiento:** Tareas de limpieza y mantenimiento.
 - **Diagnostico:** Scripts de salud e inspección de servicios.
-- **Utilidades:** Herramientas varias de soporte.
+- **Utilidades:** Herramientas de soporte y demonio de la barra de tareas.
 
 ---
 
-## Scripts Disponibles en `Scripts/Migracion/` y `Scripts/Desarrollo/`
+## Scripts Disponibles
 
-### 1. [`MigrarYActualizarAccess.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Migracion/MigrarYActualizarAccess.ps1) & [`MIGRAR_Y_ACTUALIZAR_ACCESS.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/MIGRAR_Y_ACTUALIZAR_ACCESS.bat)
-- **Objetivo:** Automatiza el flujo completo de cliente en 1 solo clic:
-  1. Copia `GESTION_ACTUAL.MDB` (o `dborigen.mdb`) hacia `bddestino.mdb`.
-  2. Crea y actualiza dinámicamente las 5 consultas API (`QryClientesApi`, `QryVendedoresApi`, `QryTarifasApi`, `QryPreciosApi`, `QryUventasApi`).
-  3. Inyecta / actualiza automáticamente el módulo VBA [`modActBdApi.bas`](file:///d:/programacio/repredi/ReprediSL_V4/src/Access/modActBdApi.bas) en la base de datos resultante mediante COM Automation.
-- **Uso:** Hacer doble clic en `Scripts\Desarrollo\MIGRAR_Y_ACTUALIZAR_ACCESS.bat`.
+### 1. [`DemonioBarraTareas.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Utilidades/DemonioBarraTareas.ps1) & [`ARRANCAR_DEMONIO_BANDEJA.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ARRANCAR_DEMONIO_BANDEJA.bat)
+- **Objetivo:** Demonio alojado en la bandeja del sistema (System Tray de Windows junto al reloj).
+- **Características:**
+  - **Sincronización en Tiempo Real:** Muestra el log en vivo (`Conectando a postgres ...`, `Actualizando Clientes (x de y) ...`).
+  - **Alertas Escalonadas y Reintentos Configurables:** 
+    - 1er aviso: Inmediato al recibir el pedido.
+    - 2º aviso: A los 1 min si no se ha marcado como leído (configurable).
+    - 3er aviso y siguientes: Cada 5 min si sigue sin leerse (configurable).
+    - Máximo de avisos por pedido configurable (`MaxAvisosPorPedido = 3`).
+  - **Herramienta de Detención de Emergencia:** Incluye [`PARAR_DEMONIO_BANDEJA.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/PARAR_DEMONIO_BANDEJA.bat) para forzar la detención limpia e instantánea de cualquier proceso demonio colgado o en ejecución.
+- **Uso:** Hacer doble clic en `Scripts\Desarrollo\ARRANCAR_DEMONIO_BANDEJA.bat` para iniciar o `Scripts\Desarrollo\PARAR_DEMONIO_BANDEJA.bat` para detener.
 
-### 2. `ARRANCAR_POSTGREST.bat`
+### 2. [`EjecutarExportacionAccess.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/BaseDatos/EjecutarExportacionAccess.ps1) & [`EJECUTAR_EXPORTACION_POSTGRES.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/EJECUTAR_EXPORTACION_POSTGRES.bat)
+- **Objetivo:** Ejecuta la rutina masiva VBA `ExportarTablas()` desde fuera de Access (sin necesidad de abrir Access a mano).
+
+### 3. [`MigrarYActualizarAccess.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Migracion/MigrarYActualizarAccess.ps1) & [`MIGRAR_Y_ACTUALIZAR_ACCESS.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/MIGRAR_Y_ACTUALIZAR_ACCESS.bat)
+- **Objetivo:** Copia la base origen a `bddestino.mdb`, genera las 5 consultas `Qry*Api` e inyecta [`modActBdApi.bas`](file:///d:/programacio/repredi/ReprediSL_V4/src/Access/modActBdApi.bas).
+
+### 4. `ARRANCAR_POSTGREST.bat`
 - **Objetivo:** Inicia el servidor PostgREST 16 empleando la configuración de `src/API/postgrest.conf`.
-- **Uso:** `Scripts\Desarrollo\ARRANCAR_POSTGREST.bat`
 
-### 3. `BUILD_PRODUCCION.bat`
-- **Objetivo:** Ejecuta el proceso de compilación optimizado para producción en `src/Frontend`.
-- **Uso:** `Scripts\Desarrollo\BUILD_PRODUCCION.bat`
-
-### 4. `PROBAR_API_LOCAL.bat`
-- **Objetivo:** Realiza una petición de prueba contra `http://127.0.0.1:3000/clientes?limit=1` para verificar el estado de la API.
-- **Uso:** `Scripts\Desarrollo\PROBAR_API_LOCAL.bat`
-
-### 5. `ABRIR_FIREWALL_HTTPS.bat`
-- **Objetivo:** Configura las reglas de entrada en el Firewall de Windows Defender para permitir tráfico en puertos de API/HTTPS.
+### 5. `BUILD_PRODUCCION.bat`
+- **Objetivo:** Ejecuta la compilación de Vite en `src/Frontend`.

@@ -98,17 +98,10 @@ try {
     Write-Host "[4/4] Inyectando modulo VBA ($ModuloBas)..." -ForegroundColor Yellow
     if (Test-Path $pathModulo) {
         try {
-            $vbProj = $accessApp.VBE.ActiveVBProject
-            foreach ($comp in $vbProj.VBComponents) {
-                if ($comp.Name -eq "modActBdApi") {
-                    $vbProj.VBComponents.Remove($comp)
-                    break
-                }
-            }
-            $vbProj.VBComponents.Import($pathModulo) | Out-Null
+            $accessApp.LoadFromText(5, "modActBdApi", $pathModulo) # acModule = 5
             Write-Host "      Modulo modActBdApi.bas inyectado correctamente en el MDB." -ForegroundColor Green
         } catch {
-            Write-Host "      Nota: Para importar VBA por COM, asegura marcar 'Confiar en el acceso al modelo de objetos de proyectos de VBA' en Access." -ForegroundColor Yellow
+            Write-Host "      Aviso al inyectar modulo VBA: $_" -ForegroundColor Yellow
         }
     }
 

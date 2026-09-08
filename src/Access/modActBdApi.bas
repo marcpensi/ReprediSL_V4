@@ -29,6 +29,8 @@ Public Sub ExportarTablas()
 
     On Error GoTo Err_Handler
 
+    RegistrarLogSync "Iniciando proceso de sincronizacion masiva..."
+    
     ' 1. Asegurar que las consultas y campos necesarios existan en Access
     ActualizarEstructuraAccess
 
@@ -38,8 +40,10 @@ Public Sub ExportarTablas()
     nomTabla(3) = "precios"
     nomTabla(4) = "uventas"
 
+    RegistrarLogSync "Conectando a postgres ..."
     Set db = CurrentDb
     Set cn = AbrirConexionPostgres()
+    RegistrarLogSync "Conexion con postgres establecida con exito."
 
     For i = LBound(nomTabla) To UBound(nomTabla)
         nomTab = nomTabla(i)
@@ -49,9 +53,7 @@ Public Sub ExportarTablas()
 
     AplicarPermisosAPostgres
 
-    MsgBox "Exportacion optimizada por lotes finalizada correctamente.", _
-           vbInformation, _
-           "PostgreSQL"
+    RegistrarLogSync "Sincronizacion masiva finalizada con exito [OK]."
 
 Salir:
     On Error Resume Next
@@ -63,9 +65,12 @@ Salir:
     Exit Sub
 
 Err_Handler:
-    MsgBox "Error durante la exportacion." & vbCrLf & vbCrLf & _
-           "Error " & Err.Number & vbCrLf & Err.Description, _
-           vbCritical, "PostgreSQL"
+    RegistrarLogSync "Error durante la exportacion: " & Err.Description
+    If Application.UserControl Then
+        MsgBox "Error durante la exportacion." & vbCrLf & vbCrLf & _
+               "Error " & Err.Number & vbCrLf & Err.Description, _
+               vbCritical, "PostgreSQL"
+    End If
     Resume Salir
 End Sub
 
@@ -145,6 +150,7 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
 
     Dim rs As DAO.Recordset
     Dim n As Long
+    Dim totalFilas As Long
     Dim strCreaVista As String
     Dim transaccionActiva As Boolean
     Dim fld As DAO.Field
@@ -152,10 +158,23 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
     Dim ValFila As String
     Dim BatchValues As String
     Dim BatchCount As Long
+    Dim NombreMostrar As String
 
     On Error GoTo Err_Handler
 
+    NombreMostrar = UCase$(Left$(NombreTabla, 1)) & Mid$(NombreTabla, 2)
     Set rs = db.OpenRecordset(NombreQuery, dbOpenSnapshot)
+
+    ' Calcular total de filas
+    If Not rs.EOF Then
+        rs.MoveLast
+        totalFilas = rs.RecordCount
+        rs.MoveFirst
+    Else
+        totalFilas = 0
+    End If
+
+    RegistrarLogSync "Actualizando " & NombreMostrar & " (0 de " & Format$(totalFilas, "#,##0") & ") ..."
 
     If Not TablaExistePostgres(cn, NombreTabla) Then
         CrearTablaPostgres cn, NombreTabla, rs
@@ -189,6 +208,7 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
 
         If BatchCount >= BATCH_SIZE Then
             cn.Execute "INSERT INTO public." & Q(NombreTabla) & " (" & CamposHeader & ") VALUES " & BatchValues
+            RegistrarLogSync "Actualizando " & NombreMostrar & " (" & Format$(n, "#,##0") & " de " & Format$(totalFilas, "#,##0") & ") ..."
             BatchValues = ""
             BatchCount = 0
         End If
@@ -198,6 +218,7 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
 
     If BatchValues <> "" Then
         cn.Execute "INSERT INTO public." & Q(NombreTabla) & " (" & CamposHeader & ") VALUES " & BatchValues
+        RegistrarLogSync "Actualizando " & NombreMostrar & " (" & Format$(n, "#,##0") & " de " & Format$(totalFilas, "#,##0") & ") [OK]"
     End If
 
     cn.CommitTrans
@@ -226,6 +247,25 @@ Err_Handler:
     On Error GoTo 0
 
     Err.Raise NumeroError, "ExportarQueryAPostgres (" & NombreTabla & ")", DescripcionError
+End Sub
+
+' =========================================================
+' REGISTRADOR DE PROGRESO DE REGISTRO EN TIEMPO REAL
+' =========================================================
+
+Private Sub RegistrarLogSync(ByVal Mensaje As String)
+    On Error Resume Next
+    Dim fileNum As Integer
+    Dim logPath As String
+    logPath = CurrentProject.Path & "\sync_progress.log"
+    fileNum = FreeFile
+    Open logPath For Append As #fileNum
+    Print #fileNum, "[" & Format$(Now, "hh:nn:ss") & "] " & Mensaje
+    Close #fileNum
+End Sub
+
+Public Sub RegistrarNuevoPedido(ByVal numPedido As String, ByVal cliente As String, ByVal importe As Double)
+    RegistrarLogSync "📦 [NUEVO PEDIDO] Recibido pedido N.º " & numPedido & " | Cliente: " & cliente & " | Importe: " & Format$(importe, "#,##0.00") & " €"
 End Sub
 
 ' =========================================================

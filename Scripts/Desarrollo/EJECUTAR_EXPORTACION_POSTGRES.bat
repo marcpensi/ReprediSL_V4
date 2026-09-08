@@ -1,12 +1,12 @@
 @echo off
 chcp 65001 > nul
-title Verificador de API PostgREST Local - ReprediSL V4
+title Exportador Access a PostgreSQL - ReprediSL V4
 echo =========================================================
-echo  VERIFICANDO RESPUESTA DE API POSTGREST LOCAL (127.0.0.1:3000)
+echo  EJECUTANDO EXPORTACION MDB A POSTGRESQL DESDE FUERA
 echo =========================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\Diagnostico\ProbarApiLocal.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\BaseDatos\EjecutarExportacionAccess.ps1"
 
 echo.
 echo Presiona cualquier tecla para salir...
