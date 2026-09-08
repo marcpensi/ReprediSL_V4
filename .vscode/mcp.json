@@ -1,0 +1,12 @@
+{
+    "servers": {
+        "access-explorer-local": {
+            "command": "C:/Users/Usuario/AppData/Roaming/Antigravity IDE/User/globalStorage/luna-soft.access-explorer/runtime/mcp-access/.venv/Scripts/python.exe",
+            "args": [
+                "C:/Users/Usuario/AppData/Roaming/Antigravity IDE/User/globalStorage/luna-soft.access-explorer/runtime/mcp-access/MCP-Access/access_mcp_server.py",
+                "--db",
+                "D:/programacio/repredi/ReprediSL_V4/src/Access/E0012026/gestion.mdb"
+            ]
+        }
+    }
+}

@@ -25,6 +25,17 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
     - 2º aviso: A los 1 min si no se ha marcado como leído (configurable).
     - 3er aviso y siguientes: Cada 5 min si sigue sin leerse (configurable).
     - Máximo de avisos por pedido configurable (`MaxAvisosPorPedido = 3`).
+  - **Monitoreo y Alertas en ROJO:**
+    - Resaltado visual en **ROJO** para errores y **NARANJA** para advertencias en la consola en tiempo real (`RichTextBox`).
+    - Guardado paralelo en log especial de incidencias (`src/Access/sync_errors.log`).
+    - Modal emergente de revisión de incidencias (`[ 🚨 VER ERRORES (X) ]`).
+    - Detección de ráfagas/incrementos elevados de errores (alertas de nivel crítico si ocurren 3 o más incidencias en 60 segundos).
+  - **Inserción Automática en ERP PsGest:**
+    - Creación e inserción de pedidos confirmados directamente en `RutaPsgest\E0012026\gestion.mdb`.
+  - **Gestión de Registros:**
+    - Exportación de registro a `.txt`/`.log`.
+    - Impresión directa del registro.
+    - Limpieza con pregunta y copia de seguridad previa.
   - **Herramienta de Detención de Emergencia:** Incluye [`PARAR_DEMONIO_BANDEJA.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/PARAR_DEMONIO_BANDEJA.bat) para forzar la detención limpia e instantánea de cualquier proceso demonio colgado o en ejecución.
 - **Uso:** Hacer doble clic en `Scripts\Desarrollo\ARRANCAR_DEMONIO_BANDEJA.bat` para iniciar o `Scripts\Desarrollo\PARAR_DEMONIO_BANDEJA.bat` para detener.
 

@@ -13,26 +13,47 @@ Private Const PG_USER As String = "postgres"
 Private Const PG_PASSWORD As String = "Marc"
 Private Const BATCH_SIZE As Long = 500
 
-Private db As DAO.Database
+Private db As Object
 Private cn As Object
+
+' Constantes DAO (para evitar fallos de compilacion por falta de referencia de tipo)
+Private Const dbOpenSnapshot As Long = 4
+Private Const dbBoolean As Long = 1
+Private Const dbByte As Long = 2
+Private Const dbInteger As Long = 3
+Private Const dbLong As Long = 4
+Private Const dbCurrency As Long = 5
+Private Const dbSingle As Long = 6
+Private Const dbDouble As Long = 7
+Private Const dbDate As Long = 8
+Private Const dbText As Long = 10
+Private Const dbLongBinary As Long = 11
+Private Const dbMemo As Long = 12
+Private Const dbGUID As Long = 15
+Private Const dbBigInt As Long = 16
+Private Const dbDecimal As Long = 20
 
 ' =========================================================
 ' EXPORTACION PRINCIPAL Y ACTUALIZACION AUTOMATICA
 ' =========================================================
 
-Public Sub ExportarTablas()
+Public Function ExportarTablas() As Boolean
 
     Dim nomTabla(0 To 4) As String
     Dim i As Long
     Dim nomTab As String
     Dim nomQry As String
 
+    RegistrarLogSync "DEBUG STEP 1: Entrando en ExportarTablas"
+
     On Error GoTo Err_Handler
 
-    RegistrarLogSync "Iniciando proceso de sincronizacion masiva..."
+    RegistrarLogSync "DEBUG STEP 2: Error Handler configurado"
     
     ' 1. Asegurar que las consultas y campos necesarios existan en Access
+    RegistrarLogSync "DEBUG STEP 3: ActualizarEstructuraAccess..."
     ActualizarEstructuraAccess
+    RegistrarLogSync "DEBUG STEP 4: Estructura OK"
 
     nomTabla(0) = "clientes"
     nomTabla(1) = "vendedores"
@@ -40,20 +61,23 @@ Public Sub ExportarTablas()
     nomTabla(3) = "precios"
     nomTabla(4) = "uventas"
 
-    RegistrarLogSync "Conectando a postgres ..."
+    RegistrarLogSync "DEBUG STEP 5: AbrirConexionPostgres..."
     Set db = CurrentDb
     Set cn = AbrirConexionPostgres()
-    RegistrarLogSync "Conexion con postgres establecida con exito."
+    RegistrarLogSync "DEBUG STEP 6: Conectado a Postgres"
 
     For i = LBound(nomTabla) To UBound(nomTabla)
         nomTab = nomTabla(i)
         nomQry = "Qry" & UCase$(Left$(nomTab, 1)) & Mid$(nomTab, 2) & "Api"
+        RegistrarLogSync "DEBUG STEP 7: Exportando " & nomQry
         ExportarQueryAPostgres nomQry, nomTab
     Next i
 
+    RegistrarLogSync "DEBUG STEP 8: Permisos"
     AplicarPermisosAPostgres
 
     RegistrarLogSync "Sincronizacion masiva finalizada con exito [OK]."
+    ExportarTablas = True
 
 Salir:
     On Error Resume Next
@@ -62,17 +86,18 @@ Salir:
     End If
     Set cn = Nothing
     Set db = Nothing
-    Exit Sub
+    Exit Function
 
 Err_Handler:
-    RegistrarLogSync "Error durante la exportacion: " & Err.Description
+    ExportarTablas = False
+    RegistrarLogSync "ERROR IN HANDLER: " & Err.Number & " - " & Err.Description
     If Application.UserControl Then
         MsgBox "Error durante la exportacion." & vbCrLf & vbCrLf & _
                "Error " & Err.Number & vbCrLf & Err.Description, _
                vbCritical, "PostgreSQL"
     End If
     Resume Salir
-End Sub
+End Function
 
 ' =========================================================
 ' ACTUALIZADOR AUTOMATICO DE ESTRUCTURA Y CONSULTAS ACCESS
@@ -92,24 +117,21 @@ Public Sub ActualizarEstructuraAccess()
 
     ' 2. Crear / Actualizar las 5 Consultas API Requeridas
     CrearOCambiarConsultaAPI localDb, "QryClientesApi", _
-        "SELECT CodCliente AS id_cliente, CodCliente AS codigo, NombreFiscal AS nombre, " & _
-        "NombreComercial AS nombre_comercial, NifCIF AS nif, Telefono AS telefono, " & _
-        "Movil AS movil, Email AS email, Web AS web, Direccion AS street, CodPostal AS codigo_postal, " & _
-        "Poblacion AS city, Provincia AS state, DireccionEnvio AS direccionenvio, " & _
-        "CodPostalEnvio AS cpostalenvio, PoblacionEnvio AS poblacionenvio, ProvinciaEnvio AS provinciaenvio, " & _
-        "Banco AS nombre_banco, IBAN AS cuenta_bancaria, CodVendedor AS id_vendedor FROM Clientes"
+        "SELECT [Clientes].[Codigo] AS id_cliente, [Clientes].[Codigo] AS codigo, [Clientes].[Nombre] AS nombre, " & _
+        "[Clientes].[NombreComercial] AS nombre_comercial, [Clientes].[Nif] AS nif, " & _
+        "[Clientes].[Vendedor] AS id_vendedor FROM Clientes"
 
     CrearOCambiarConsultaAPI localDb, "QryVendedoresApi", _
-        "SELECT CodVendedor AS id_vendedor, Nombre AS nombre_vendedor, Serie AS serie FROM Vendedores"
+        "SELECT [Vendedores].[Codigo] AS id_vendedor, [Vendedores].[Nombre] AS nombre_vendedor FROM Vendedores"
 
     CrearOCambiarConsultaAPI localDb, "QryTarifasApi", _
-        "SELECT CodTarifa AS id_tarifa, NombreTarifa AS nombre_tarifa, Descuento AS descuento FROM Tarifas"
+        "SELECT [Tarifas].[Codigo] AS id_tarifa, [Tarifas].[Nombre] AS nombre_tarifa FROM Tarifas"
 
     CrearOCambiarConsultaAPI localDb, "QryPreciosApi", _
-        "SELECT CodProducto AS id_producto, CodProducto AS codigo, CodTarifa AS id_tarifa, PrecioVenta AS precio_venta FROM Precios"
+        "SELECT [Precios].[Articulo] AS id_producto, [Precios].[Articulo] AS codigo, [Precios].[Tarifa] AS id_tarifa, [Precios].[Precio] AS precio_venta FROM Precios"
 
     CrearOCambiarConsultaAPI localDb, "QryUventasApi", _
-        "SELECT CodProducto AS id_producto, CodProducto AS codigo, UnidadesCaja AS unidades_caja, UnidadVenta AS unidad_venta FROM Uventas"
+        "SELECT [Articulos].[Codigo] AS id_producto, [Articulos].[Codigo] AS codigo, [Articulos].[BultosPredet] AS unidades_caja, [Articulos].[Unidad] AS unidad_venta FROM Articulos"
 
     Set localDb = Nothing
 End Sub
@@ -176,11 +198,12 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
 
     RegistrarLogSync "Actualizando " & NombreMostrar & " (0 de " & Format$(totalFilas, "#,##0") & ") ..."
 
-    If Not TablaExistePostgres(cn, NombreTabla) Then
-        CrearTablaPostgres cn, NombreTabla, rs
-    Else
-        cn.Execute "TRUNCATE TABLE public." & Q(NombreTabla)
+    If TablaExistePostgres(cn, NombreTabla) Then
+        On Error Resume Next
+        cn.Execute "DROP TABLE public." & Q(NombreTabla) & " CASCADE"
+        On Error GoTo Err_Handler
     End If
+    CrearTablaPostgres cn, NombreTabla, rs
 
     CamposHeader = ""
     For Each fld In rs.Fields
@@ -257,15 +280,25 @@ Private Sub RegistrarLogSync(ByVal Mensaje As String)
     On Error Resume Next
     Dim fileNum As Integer
     Dim logPath As String
+    Dim errLogPath As String
+
     logPath = CurrentProject.Path & "\sync_progress.log"
     fileNum = FreeFile
     Open logPath For Append As #fileNum
     Print #fileNum, "[" & Format$(Now, "hh:nn:ss") & "] " & Mensaje
     Close #fileNum
+
+    If InStr(1, Mensaje, "ERROR", vbTextCompare) > 0 Or InStr(1, Mensaje, "Fallo", vbTextCompare) > 0 Then
+        errLogPath = CurrentProject.Path & "\sync_errors.log"
+        fileNum = FreeFile
+        Open errLogPath For Append As #fileNum
+        Print #fileNum, "[" & Format$(Now, "hh:nn:ss") & "] " & Mensaje
+        Close #fileNum
+    End If
 End Sub
 
 Public Sub RegistrarNuevoPedido(ByVal numPedido As String, ByVal cliente As String, ByVal importe As Double)
-    RegistrarLogSync "📦 [NUEVO PEDIDO] Recibido pedido N.º " & numPedido & " | Cliente: " & cliente & " | Importe: " & Format$(importe, "#,##0.00") & " €"
+    RegistrarLogSync "[NUEVO PEDIDO] Recibido pedido N. " & numPedido & " | Cliente: " & cliente & " | Importe: " & Format$(importe, "#,##0.00") & " EUR"
 End Sub
 
 ' =========================================================

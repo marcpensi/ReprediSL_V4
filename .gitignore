@@ -4,3 +4,7 @@ dist/
 .kiro/
 scratch/
 *.log
+bin/
+obj/
+*.ldb
+*.laccdb

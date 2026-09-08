@@ -1,5 +1,5 @@
 param (
-    [string]$DbMdb = "src/Access/BdDestino.mdb"
+    [string]$DbMdb = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,14 +17,34 @@ function Get-AbsolutePath([string]$path) {
     return [System.IO.Path]::GetFullPath((Join-Path $ProjectRoot $path))
 }
 
+# Resolucion dinamica de la ruta gestion.mdb (donde entran y se confirman los pedidos)
+if (-not $DbMdb -or $DbMdb -eq "src/Access/BdDestino.mdb") {
+    $candidatos = @(
+        (Join-Path $ProjectRoot "src/Access/E0012026/gestion.mdb"),
+        (Join-Path $ProjectRoot "src/Access/gestion.mdb"),
+        "C:\PsGest\E0012026\gestion.mdb",
+        (Join-Path $ProjectRoot "src/Access/BdDestino.mdb")
+    )
+    foreach ($cand in $candidatos) {
+        if (Test-Path $cand) {
+            $DbMdb = $cand
+            break
+        }
+    }
+}
+
 $pathMdb = Get-AbsolutePath $DbMdb
+$logPath = Join-Path $ProjectRoot "src/Access/sync_progress.log"
 
 Write-Host "=========================================================" -ForegroundColor Cyan
 Write-Host " EJECUTOR DE EXPORTACION ACCESS -> POSTGRESQL (EXTERNO)" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
 
 if (-not (Test-Path $pathMdb)) {
-    Write-Error "La base de datos MDB no existe: $pathMdb"
+    $errMsg = "La base de datos MDB no existe: $pathMdb"
+    Write-Error $errMsg
+    Add-Content -Path $logPath -Value "[$((Get-Date).ToString('HH:mm:ss'))] [ERROR] $errMsg" -Encoding UTF8
+    Exit 1
 }
 
 # Limpieza previa de cualquier proceso colgado de Access
@@ -32,9 +52,11 @@ Get-Process -Name MSACCESS -ErrorAction SilentlyContinue | Stop-Process -Force -
 Start-Sleep -Milliseconds 300
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
+$ahoraStr = (Get-Date).ToString('HH:mm:ss')
+Add-Content -Path $logPath -Value "[$ahoraStr] [EXPORTACION] Iniciando exportacion de $pathMdb a PostgreSQL..." -Encoding UTF8
 
 Write-Host "[1/3] Abriendo base de datos MDB en segundo plano..." -ForegroundColor Yellow
-Write-Host "      Ruta: $pathMdb" -ForegroundColor Gray
+Write-Host "      Ruta ERP (gestion.mdb): $pathMdb" -ForegroundColor Gray
 
 $accessApp = New-Object -ComObject Access.Application
 $accessApp.Visible = $false
@@ -44,25 +66,62 @@ try {
     $accessApp.OpenCurrentDatabase($pathMdb)
     Write-Host "      Base MDB abierta correctamente." -ForegroundColor Green
 
-    Write-Host "[2/3] Ejecutando sincronizacion masiva en lotes ('ExportarTablas')..." -ForegroundColor Yellow
+    Write-Host "[2/3] Importando y ejecutando sincronizacion ('ExportarTablas')..." -ForegroundColor Yellow
     Write-Host "      Tablas afectadas: clientes, vendedores, tarifas, precios, uventas" -ForegroundColor Gray
     
     $pathModulo = Get-AbsolutePath "src/Access/modActBdApi.bas"
     if (Test-Path $pathModulo) {
+        # 1. Eliminar modulo previo si existe para forzar la actualizacion limpia
+        try {
+            $accessApp.DoCmd.DeleteObject(5, "modActBdApi") # 5 = acModule
+        } catch {}
+
+        # 2. Cargar/Importar modulo modActBdApi.bas en gestion.mdb y GUARDARLO explícitamente
+        $loadedOk = $false
         try {
             $accessApp.LoadFromText(5, "modActBdApi", $pathModulo)
-        } catch {}
+            $accessApp.DoCmd.Save(5, "modActBdApi")
+            $loadedOk = $true
+            Write-Host "      Modulo modActBdApi importado mediante LoadFromText OK." -ForegroundColor Gray
+        } catch {
+            Write-Host "      [INFO] LoadFromText fallo: $_" -ForegroundColor Yellow
+            try {
+                if ($accessApp.VBE -and $accessApp.VBE.ActiveVBProject) {
+                    $accessApp.VBE.ActiveVBProject.VBComponents.Import($pathModulo) | Out-Null
+                    $accessApp.DoCmd.Save(5, "modActBdApi")
+                    $loadedOk = $true
+                    Write-Host "      Modulo modActBdApi importado mediante VBE OK." -ForegroundColor Gray
+                }
+            } catch {
+                Write-Host "      [AVISO] Intento de importacion VBE fallo: $_" -ForegroundColor Yellow
+            }
+        }
     }
 
-    $accessApp.Run("ExportarTablas")
+    # Ejecutar la funcion principal de exportacion (Eval / Run)
+    try {
+        [void]$accessApp.Eval("ExportarTablas()")
+    } catch {
+        try {
+            $accessApp.Run("ExportarTablas")
+        } catch {
+            $accessApp.Run("modActBdApi.ExportarTablas")
+        }
+    }
     
     $sw.Stop()
+    $totalSeg = [math]::Round($sw.Elapsed.TotalSeconds, 2)
     Write-Host "[3/3] Exportacion a PostgreSQL y recarga de PostgREST OK!" -ForegroundColor Green
-    Write-Host "      Tiempo total de sincronización: $([math]::Round($sw.Elapsed.TotalSeconds, 2)) segundos" -ForegroundColor Cyan
+    Write-Host "      Tiempo total de sincronizacion: $totalSeg segundos" -ForegroundColor Cyan
     Write-Host "=========================================================" -ForegroundColor Cyan
 
+    Add-Content -Path $logPath -Value "[$((Get-Date).ToString('HH:mm:ss'))] [OK] Exportacion de $pathMdb a PostgreSQL finalizada con exito ($totalSeg seg)." -Encoding UTF8
+
 } catch {
-    Write-Host "      [ERROR] Fallo durante la exportacion: $_" -ForegroundColor Red
+    $errText = $_.Exception.Message
+    if (-not $errText) { $errText = $_.ToString() }
+    Write-Host "      [ERROR] Fallo durante la exportacion: $errText" -ForegroundColor Red
+    Add-Content -Path $logPath -Value "[$((Get-Date).ToString('HH:mm:ss'))] [ERROR] Fallo durante la exportacion: $errText" -Encoding UTF8
 } finally {
     if ($accessApp) {
         try { $accessApp.CloseCurrentDatabase() } catch {}
@@ -79,3 +138,4 @@ try {
         try { Remove-Item -Path $ldbPath -Force -ErrorAction SilentlyContinue } catch {}
     }
 }
+

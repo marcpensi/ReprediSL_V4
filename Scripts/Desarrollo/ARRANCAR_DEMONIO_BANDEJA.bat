@@ -1,14 +1,17 @@
 @echo off
 chcp 65001 > nul
-title Demonio de Bandeja de Sistema - ReprediSL V4
+title Demonio de Bandeja de Sistema - ReprediSL V4 (.NET 10)
 echo =========================================================
-echo  INICIANDO DEMONIO DE SINCRONIZACION EN BARRA DE TAREAS
+echo  INICIANDO DEMONIO DE SINCRONIZACION NATIVO (.NET 10)
 echo =========================================================
 echo.
 
-start "" powershell -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0..\Utilidades\DemonioBarraTareas.ps1"
+taskkill /F /IM ReprediTrayDaemon.exe > nul 2>&1
+ping -n 2 127.0.0.1 > nul
 
-echo Demonio iniciado correctamente.
-echo Se ha abierto la ventana de monitoreo y el icono en la barra de tareas (junto al reloj).
+start "" "%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
+
+echo Demonio iniciado correctamente (.NET 10).
+echo Se ha abierto la ventana de monitoreo e icono en la barra de tareas (junto al reloj).
 echo.
-timeout /t 3 > nul
+ping -n 3 127.0.0.1 > nul
