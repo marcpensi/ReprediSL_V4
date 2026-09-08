@@ -98,6 +98,15 @@ namespace ReprediTrayDaemon.Services
             ReadNewLines(AltProgressLogPath, ref lastAltReadOffset);
         }
 
+        private string lastEmittedLine = string.Empty;
+
+        private void EmitLogLine(string line, LogLevel level)
+        {
+            if (string.Equals(lastEmittedLine, line, StringComparison.Ordinal)) return;
+            lastEmittedLine = line;
+            OnLogMessage?.Invoke(line, level);
+        }
+
         private void ReadNewLines(string filePath, ref long lastOffset)
         {
             if (!File.Exists(filePath)) return;
@@ -141,7 +150,7 @@ namespace ReprediTrayDaemon.Services
                             level = LogLevel.Success;
                         }
 
-                        OnLogMessage?.Invoke(line, level);
+                        EmitLogLine(line, level);
 
                         if (ErrorCount > 3 && !burstAlertTriggered && !SilenceAlerts)
                         {
@@ -184,7 +193,7 @@ namespace ReprediTrayDaemon.Services
             }
             catch { }
 
-            OnLogMessage?.Invoke(formattedMsg, level);
+            EmitLogLine(formattedMsg, level);
         }
 
         public void StopCurrentSync()
