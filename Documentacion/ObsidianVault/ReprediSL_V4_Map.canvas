@@ -1,0 +1,83 @@
+{
+  "nodes": [
+    {
+      "id": "node_pwa",
+      "type": "text",
+      "text": "# 📱 Frontend PWA\n- React 18 + Vite 6\n- IndexedDB v2 (Offline-First)\n- Service Worker (`sw.js`)",
+      "x": -300,
+      "y": -150,
+      "width": 260,
+      "height": 180
+    },
+    {
+      "id": "node_api",
+      "type": "text",
+      "text": "# ⚡ PostgREST + Caddy\n- API RESTful en PostgreSQL\n- Caddy Reverse Proxy / HTTPS",
+      "x": 40,
+      "y": -150,
+      "width": 260,
+      "height": 180
+    },
+    {
+      "id": "node_access",
+      "type": "text",
+      "text": "# 🗄️ ERP Access (gestion.mdb)\n- Módulo `modActBdApi.bas`\n- `DROP CASCADE` & Batch 500\n- Exportación masiva a Postgres",
+      "x": 380,
+      "y": -150,
+      "width": 280,
+      "height": 180
+    },
+    {
+      "id": "node_daemon",
+      "type": "text",
+      "text": "# ⚙️ Demonio C# .NET 10\n- `ReprediTrayDaemon.exe`\n- Mutex `Local\\ReprediSL_V4_Daemon_Mutex`\n- Modal Emergente >3 Errores",
+      "x": 380,
+      "y": 100,
+      "width": 280,
+      "height": 180
+    },
+    {
+      "id": "node_psagents",
+      "type": "text",
+      "text": "# 🧠 PsAgents Governance\n- Coordinador | Arquitectura\n- Auditor | Documentación | Testing\n- `AGENTS.md` & Tag `v4.1.0`",
+      "x": 40,
+      "y": 100,
+      "width": 260,
+      "height": 180
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_pwa_api",
+      "fromNode": "node_pwa",
+      "fromSide": "right",
+      "toNode": "node_api",
+      "toSide": "left",
+      "label": "HTTPS REST / Debounce"
+    },
+    {
+      "id": "edge_access_api",
+      "fromNode": "node_access",
+      "fromSide": "left",
+      "toNode": "node_api",
+      "toSide": "right",
+      "label": "Sincronización DAO / ODBC"
+    },
+    {
+      "id": "edge_daemon_access",
+      "fromNode": "node_daemon",
+      "fromSide": "top",
+      "toNode": "node_access",
+      "toSide": "bottom",
+      "label": "Monitoreo Logs & Ejecución"
+    },
+    {
+      "id": "edge_psagents_all",
+      "fromNode": "node_psagents",
+      "fromSide": "top",
+      "toNode": "node_api",
+      "toSide": "bottom",
+      "label": "Gobernanza & Auditoría"
+    }
+  ]
+}
