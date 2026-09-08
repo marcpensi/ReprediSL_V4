@@ -223,6 +223,9 @@ namespace ReprediTrayDaemon
 
             // Submenu Tamaño de Letra / Interfaz
             var itemSizeMenu = new ToolStripMenuItem("🔤 Tamaño de Letra / Interfaz");
+            itemSizeMenu.DropDown.Renderer = new DarkMenuRenderer();
+            itemSizeMenu.DropDown.BackColor = Color.FromArgb(24, 28, 38);
+            itemSizeMenu.DropDown.ForeColor = Color.FromArgb(241, 245, 249);
             itemSizeMenu.DropDownItems.Add("Pequeño (100%)", null, (s, e) => ApplyFontSize("Pequeno"));
             itemSizeMenu.DropDownItems.Add("Mediano (125%)", null, (s, e) => ApplyFontSize("Mediano"));
             itemSizeMenu.DropDownItems.Add("Grande (150%)", null, (s, e) => ApplyFontSize("Grande"));
@@ -232,6 +235,9 @@ namespace ReprediTrayDaemon
 
             // Submenu de Pruebas y Simulaciones
             var itemSimMenu = new ToolStripMenuItem("🧪 Pruebas y Simulaciones");
+            itemSimMenu.DropDown.Renderer = new DarkMenuRenderer();
+            itemSimMenu.DropDown.BackColor = Color.FromArgb(24, 28, 38);
+            itemSimMenu.DropDown.ForeColor = Color.FromArgb(241, 245, 249);
             itemSimMenu.DropDownItems.Add("📦 Simular Llegada de Pedido (Prueba)", null, (s, e) =>
             {
                 syncService.AppendLog("[NUEVO PEDIDO] Recibido pedido N. TEST-001 | Cliente: 1001 (CLIENTE DE PRUEBA SL) | Importe: 450,00 EUR", DbSyncService.LogLevel.Success);
@@ -752,6 +758,12 @@ namespace ReprediTrayDaemon
     public class DarkMenuRenderer : ToolStripProfessionalRenderer
     {
         public DarkMenuRenderer() : base(new DarkColorTable()) { }
+
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {
+            e.TextColor = e.Item.Enabled ? Color.FromArgb(241, 245, 249) : Color.FromArgb(100, 116, 139);
+            base.OnRenderItemText(e);
+        }
     }
 
     public class DarkColorTable : ProfessionalColorTable
