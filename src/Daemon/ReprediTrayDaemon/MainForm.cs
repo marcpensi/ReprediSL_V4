@@ -26,6 +26,7 @@ namespace ReprediTrayDaemon
         private Button btnPrint = null!;
         private Button btnClear = null!;
         private Button btnSizeToggle = null!;
+        private Button btnThemeToggle = null!;
         private Button btnSync = null!;
 
         // Etiquetas de estado
@@ -39,6 +40,7 @@ namespace ReprediTrayDaemon
 
         private bool autoAcceptMode = false;
         private string currentFontSize = "Grande"; // "Pequeno", "Mediano", "Grande"
+        private string currentTheme = "Oscuro";     // "Oscuro", "Claro"
         private string settingsFilePath = string.Empty;
 
         public MainForm()
@@ -59,6 +61,7 @@ namespace ReprediTrayDaemon
 
             CargarConfiguracionUI();
             ApplyFontSize(currentFontSize);
+            ApplyTheme(currentTheme);
             UpdateStatusLabels();
 
             syncService.AppendLog("Demonio de bandeja ReprediSL V4 C# NATIVO iniciado.", DbSyncService.LogLevel.Success);
@@ -72,10 +75,9 @@ namespace ReprediTrayDaemon
         private void InitializeComponentCustom()
         {
             this.Text = "ReprediSL V4 - Demonio de Pedidos & Sincronización";
-            this.MinimumSize = new Size(960, 620);
-            this.Size = new Size(1180, 740);
+            this.MinimumSize = new Size(980, 620);
+            this.Size = new Size(1200, 750);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(15, 17, 23); // Deep Dark Obsidian
             this.Icon = SystemIcons.Application;
 
             // Panel Header Superior
@@ -84,11 +86,10 @@ namespace ReprediTrayDaemon
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                BackColor = Color.FromArgb(22, 25, 34),
                 Padding = new Padding(12, 10, 12, 10)
             };
 
-            // FlowLayoutPanel para botones responsivos (se adaptan al redimensionar)
+            // FlowLayoutPanel para botones responsivos
             flowButtons = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
@@ -121,7 +122,10 @@ namespace ReprediTrayDaemon
             // 7. Boton Selector de Tamaño de Fuente
             btnSizeToggle = CreateModernButton("🔤 Fuente: GRANDE", Color.FromArgb(51, 65, 85), (s, e) => CycleFontSize(), 160);
 
-            // 8. Boton Sincronizar Ahora
+            // 8. Boton Conmutar Tema (Claro / Oscuro)
+            btnThemeToggle = CreateModernButton("🌗 Tema: OSCURO", Color.FromArgb(71, 85, 105), (s, e) => ToggleTheme(), 145);
+
+            // 9. Boton Sincronizar Ahora
             btnSync = CreateModernButton("⚡ Sincronizar PostgreSQL", Color.FromArgb(6, 182, 212), async (s, e) => await DoManualSyncAsync(), 200);
 
             flowButtons.Controls.Add(btnAck);
@@ -131,6 +135,7 @@ namespace ReprediTrayDaemon
             flowButtons.Controls.Add(btnPrint);
             flowButtons.Controls.Add(btnClear);
             flowButtons.Controls.Add(btnSizeToggle);
+            flowButtons.Controls.Add(btnThemeToggle);
             flowButtons.Controls.Add(btnSync);
 
             // TableLayoutPanel para etiquetas de estado responsivas
@@ -152,7 +157,6 @@ namespace ReprediTrayDaemon
                 Text = "Sin pedidos pendientes",
                 Dock = DockStyle.Fill,
                 AutoSize = true,
-                ForeColor = Color.FromArgb(203, 213, 225),
                 Margin = new Padding(0, 2, 0, 4)
             };
 
@@ -161,7 +165,6 @@ namespace ReprediTrayDaemon
                 Text = "Incidencias: 0 errores | 0 advertencias (Sin errores)",
                 Dock = DockStyle.Fill,
                 AutoSize = true,
-                ForeColor = Color.FromArgb(52, 211, 153),
                 Margin = new Padding(0, 2, 0, 4)
             };
 
@@ -170,7 +173,6 @@ namespace ReprediTrayDaemon
                 Text = "Destino ERP PsGest: ",
                 Dock = DockStyle.Fill,
                 AutoSize = true,
-                ForeColor = Color.FromArgb(56, 189, 248),
                 Margin = new Padding(0, 4, 0, 2)
             };
             pnlStatusInfo.SetColumnSpan(lblRutaTarget, 2);
@@ -182,13 +184,11 @@ namespace ReprediTrayDaemon
             pnlHeader.Controls.Add(pnlStatusInfo);
             pnlHeader.Controls.Add(flowButtons);
 
-            // Consola Log RichTextBox (Estilo Moderno Dark Emerald Terminal)
+            // Consola Log RichTextBox (Estilo Terminal)
             txtLog = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                BackColor = Color.FromArgb(9, 10, 15),
-                ForeColor = Color.FromArgb(52, 211, 153),
                 Font = GetConsolasFont(12.5f),
                 BorderStyle = BorderStyle.None,
                 Padding = new Padding(12)
@@ -197,13 +197,10 @@ namespace ReprediTrayDaemon
             this.Controls.Add(txtLog);
             this.Controls.Add(pnlHeader);
 
-            // ContextMenuStrip Elegante Oscuro para la Bandeja de Sistema (Boton Derecho en el Reloj)
+            // ContextMenuStrip para la Bandeja de Sistema (Boton Derecho en el Reloj)
             trayMenu = new ContextMenuStrip
             {
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Regular),
-                Renderer = new DarkMenuRenderer(),
-                ForeColor = Color.FromArgb(241, 245, 249),
-                BackColor = Color.FromArgb(24, 28, 38)
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Regular)
             };
 
             var itemTitle = new ToolStripMenuItem("🖥️ Demonio ReprediSL V4") { Enabled = false, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) };
@@ -221,23 +218,20 @@ namespace ReprediTrayDaemon
             trayMenu.Items.Add("🖨️ Imprimir Registro", null, (s, e) => ImprimirRegistro());
             trayMenu.Items.Add("🗑️ Limpiar Registro (Con Copia de Seg.)", null, (s, e) => LimpiarRegistroConConfirmacion());
 
-            // Submenu Tamaño de Letra / Interfaz
-            var itemSizeMenu = new ToolStripMenuItem("🔤 Tamaño de Letra / Interfaz");
-            itemSizeMenu.DropDown.Renderer = new DarkMenuRenderer();
-            itemSizeMenu.DropDown.BackColor = Color.FromArgb(24, 28, 38);
-            itemSizeMenu.DropDown.ForeColor = Color.FromArgb(241, 245, 249);
+            // Submenu Tamaño de Letra e Interfaz y Tema
+            var itemSizeMenu = new ToolStripMenuItem("🔤 Tamaño de Letra & Tema");
             itemSizeMenu.DropDownItems.Add("Pequeño (100%)", null, (s, e) => ApplyFontSize("Pequeno"));
             itemSizeMenu.DropDownItems.Add("Mediano (125%)", null, (s, e) => ApplyFontSize("Mediano"));
             itemSizeMenu.DropDownItems.Add("Grande (150%)", null, (s, e) => ApplyFontSize("Grande"));
+            itemSizeMenu.DropDownItems.Add("-");
+            itemSizeMenu.DropDownItems.Add("🌞 Modo Claro (Light Theme)", null, (s, e) => ApplyTheme("Claro"));
+            itemSizeMenu.DropDownItems.Add("🌙 Modo Oscuro (Dark Theme)", null, (s, e) => ApplyTheme("Oscuro"));
             trayMenu.Items.Add(itemSizeMenu);
 
             trayMenu.Items.Add("-");
 
             // Submenu de Pruebas y Simulaciones
             var itemSimMenu = new ToolStripMenuItem("🧪 Pruebas y Simulaciones");
-            itemSimMenu.DropDown.Renderer = new DarkMenuRenderer();
-            itemSimMenu.DropDown.BackColor = Color.FromArgb(24, 28, 38);
-            itemSimMenu.DropDown.ForeColor = Color.FromArgb(241, 245, 249);
             itemSimMenu.DropDownItems.Add("📦 Simular Llegada de Pedido (Prueba)", null, (s, e) =>
             {
                 syncService.AppendLog("[NUEVO PEDIDO] Recibido pedido N. TEST-001 | Cliente: 1001 (CLIENTE DE PRUEBA SL) | Importe: 450,00 EUR", DbSyncService.LogLevel.Success);
@@ -326,8 +320,8 @@ namespace ReprediTrayDaemon
             float btnFontSize = 9.5f;
             float statusFontSize = 10.5f;
             float targetFontSize = 12.5f;
-            int formWidth = 1180;
-            int formHeight = 740;
+            int formWidth = 1200;
+            int formHeight = 750;
 
             switch (size)
             {
@@ -336,8 +330,8 @@ namespace ReprediTrayDaemon
                     btnFontSize = 8.5f;
                     statusFontSize = 9f;
                     targetFontSize = 11f;
-                    formWidth = 960;
-                    formHeight = 600;
+                    formWidth = 980;
+                    formHeight = 620;
                     btnSizeToggle.Text = "🔤 Fuente: PEQUEÑO";
                     break;
                 case "Mediano":
@@ -345,8 +339,8 @@ namespace ReprediTrayDaemon
                     btnFontSize = 9f;
                     statusFontSize = 10f;
                     targetFontSize = 12f;
-                    formWidth = 1060;
-                    formHeight = 665;
+                    formWidth = 1080;
+                    formHeight = 680;
                     btnSizeToggle.Text = "🔤 Fuente: MEDIANO";
                     break;
                 default: // Grande
@@ -354,8 +348,8 @@ namespace ReprediTrayDaemon
                     btnFontSize = 9.5f;
                     statusFontSize = 10.5f;
                     targetFontSize = 12.5f;
-                    formWidth = 1180;
-                    formHeight = 740;
+                    formWidth = 1200;
+                    formHeight = 750;
                     btnSizeToggle.Text = "🔤 Fuente: GRANDE";
                     break;
             }
@@ -371,11 +365,86 @@ namespace ReprediTrayDaemon
             btnPrint.Font = btnFont;
             btnClear.Font = btnFont;
             btnSizeToggle.Font = btnFont;
+            btnThemeToggle.Font = btnFont;
             btnSync.Font = btnFont;
 
             lblPendientes.Font = new Font("Segoe UI", statusFontSize, FontStyle.Bold);
             lblErrorStatus.Font = new Font("Segoe UI", statusFontSize, FontStyle.Bold);
             lblRutaTarget.Font = new Font("Segoe UI", targetFontSize, FontStyle.Bold);
+        }
+
+        private void ToggleTheme()
+        {
+            if (currentTheme == "Oscuro") ApplyTheme("Claro");
+            else ApplyTheme("Oscuro");
+        }
+
+        private void ApplyTheme(string theme)
+        {
+            currentTheme = theme;
+            GuardarConfiguracionUI();
+
+            if (theme == "Claro")
+            {
+                this.BackColor = Color.FromArgb(241, 245, 249);
+                pnlHeader.BackColor = Color.FromArgb(226, 232, 240);
+                txtLog.BackColor = Color.White;
+                txtLog.ForeColor = Color.FromArgb(15, 23, 42);
+
+                lblPendientes.ForeColor = Color.FromArgb(51, 65, 85);
+                lblRutaTarget.ForeColor = Color.FromArgb(2, 132, 199);
+
+                var lightRenderer = new LightMenuRenderer();
+                trayMenu.Renderer = lightRenderer;
+                trayMenu.BackColor = Color.White;
+                trayMenu.ForeColor = Color.FromArgb(15, 23, 42);
+
+                ApplyMenuThemeRecursive(trayMenu.Items, lightRenderer, Color.White, Color.FromArgb(15, 23, 42));
+
+                btnThemeToggle.Text = "🌞 Tema: CLARO";
+                btnThemeToggle.BackColor = Color.FromArgb(203, 213, 225);
+                btnThemeToggle.ForeColor = Color.FromArgb(15, 23, 42);
+            }
+            else // Oscuro (Slate High Contrast Dark)
+            {
+                this.BackColor = Color.FromArgb(15, 23, 42);
+                pnlHeader.BackColor = Color.FromArgb(30, 41, 59);
+                txtLog.BackColor = Color.FromArgb(2, 6, 23);
+                txtLog.ForeColor = Color.FromArgb(52, 211, 153);
+
+                lblPendientes.ForeColor = Color.FromArgb(203, 213, 225);
+                lblRutaTarget.ForeColor = Color.FromArgb(56, 189, 248);
+
+                var darkRenderer = new DarkMenuRenderer();
+                trayMenu.Renderer = darkRenderer;
+                trayMenu.BackColor = Color.FromArgb(30, 41, 59);
+                trayMenu.ForeColor = Color.White;
+
+                ApplyMenuThemeRecursive(trayMenu.Items, darkRenderer, Color.FromArgb(30, 41, 59), Color.White);
+
+                btnThemeToggle.Text = "🌙 Tema: OSCURO";
+                btnThemeToggle.BackColor = Color.FromArgb(51, 65, 85);
+                btnThemeToggle.ForeColor = Color.White;
+            }
+
+            UpdateStatusLabels();
+        }
+
+        private void ApplyMenuThemeRecursive(ToolStripItemCollection items, ToolStripRenderer renderer, Color backColor, Color foreColor)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                if (item is ToolStripMenuItem menuItem)
+                {
+                    menuItem.DropDown.Renderer = renderer;
+                    menuItem.DropDown.BackColor = backColor;
+                    menuItem.DropDown.ForeColor = foreColor;
+                    if (menuItem.HasDropDownItems)
+                    {
+                        ApplyMenuThemeRecursive(menuItem.DropDownItems, renderer, backColor, foreColor);
+                    }
+                }
+            }
         }
 
         private void CargarConfiguracionUI()
@@ -394,6 +463,10 @@ namespace ReprediTrayDaemon
                     {
                         autoAcceptMode = elemAuto.GetBoolean();
                     }
+                    if (doc.RootElement.TryGetProperty("TemaInterfaz", out var elemTema))
+                    {
+                        currentTheme = elemTema.GetString() ?? "Oscuro";
+                    }
                 }
             }
             catch { }
@@ -406,7 +479,8 @@ namespace ReprediTrayDaemon
                 var data = new
                 {
                     TamanoFuente = currentFontSize,
-                    AutoAceptar = autoAcceptMode
+                    AutoAceptar = autoAcceptMode,
+                    TemaInterfaz = currentTheme
                 };
                 string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(settingsFilePath, json);
@@ -423,20 +497,30 @@ namespace ReprediTrayDaemon
             {
                 btnAutoToggle.Text = "⚙️ AUTO-ACEPTAR ACTIVO";
                 btnAutoToggle.BackColor = Color.FromArgb(16, 185, 129);
-                syncService.AppendLog("[CONFIG] Auto-aceptacion de pedidos ACTIVADA.", DbSyncService.LogLevel.Info);
+                syncService.AppendLog("[CONFIG] Auto-aceptación de pedidos ACTIVADA.", DbSyncService.LogLevel.Info);
             }
             else
             {
                 btnAutoToggle.Text = "⚙️ CONFIRMACIÓN MANUAL";
                 btnAutoToggle.BackColor = Color.FromArgb(99, 102, 241);
-                syncService.AppendLog("[CONFIG] Auto-aceptacion de pedidos DESACTIVADA (Modo Confirmacion Manual).", DbSyncService.LogLevel.Info);
+                syncService.AppendLog("[CONFIG] Auto-aceptación de pedidos DESACTIVADA (Modo Confirmación Manual).", DbSyncService.LogLevel.Info);
             }
         }
 
         private void UpdateStatusLabels()
         {
             lblPendientes.Text = "Sin pedidos pendientes";
-            lblPendientes.ForeColor = Color.FromArgb(203, 213, 225);
+
+            if (currentTheme == "Claro")
+            {
+                lblPendientes.ForeColor = Color.FromArgb(51, 65, 85);
+                lblRutaTarget.ForeColor = Color.FromArgb(2, 132, 199);
+            }
+            else
+            {
+                lblPendientes.ForeColor = Color.FromArgb(203, 213, 225);
+                lblRutaTarget.ForeColor = Color.FromArgb(56, 189, 248);
+            }
 
             if (autoAcceptMode)
             {
@@ -475,13 +559,27 @@ namespace ReprediTrayDaemon
                 return;
             }
 
-            Color logColor = level switch
+            Color logColor;
+            if (currentTheme == "Claro")
             {
-                DbSyncService.LogLevel.Error => Color.FromArgb(244, 63, 94),   // Rose Red
-                DbSyncService.LogLevel.Warning => Color.FromArgb(245, 158, 11), // Amber Warning
-                DbSyncService.LogLevel.Success => Color.FromArgb(52, 211, 153), // Emerald Green
-                _ => Color.FromArgb(56, 189, 248)                                // Sky Blue Info
-            };
+                logColor = level switch
+                {
+                    DbSyncService.LogLevel.Error => Color.FromArgb(220, 38, 38),   // Dark Red
+                    DbSyncService.LogLevel.Warning => Color.FromArgb(217, 119, 6), // Amber Dark
+                    DbSyncService.LogLevel.Success => Color.FromArgb(5, 150, 105), // Emerald Dark
+                    _ => Color.FromArgb(2, 132, 199)                               // Blue Info
+                };
+            }
+            else
+            {
+                logColor = level switch
+                {
+                    DbSyncService.LogLevel.Error => Color.FromArgb(244, 63, 94),   // Rose Red
+                    DbSyncService.LogLevel.Warning => Color.FromArgb(245, 158, 11), // Amber Warning
+                    DbSyncService.LogLevel.Success => Color.FromArgb(52, 211, 153), // Emerald Green
+                    _ => Color.FromArgb(56, 189, 248)                                // Sky Blue Info
+                };
+            }
 
             txtLog.SelectionStart = txtLog.TextLength;
             txtLog.SelectionLength = 0;
@@ -639,11 +737,15 @@ namespace ReprediTrayDaemon
 
         private void MostrarVentanaErrores()
         {
+            Color dialogBg = currentTheme == "Claro" ? Color.FromArgb(254, 242, 242) : Color.FromArgb(24, 15, 20);
+            Color topBg = currentTheme == "Claro" ? Color.FromArgb(254, 226, 226) : Color.FromArgb(38, 20, 28);
+            Color textBg = currentTheme == "Claro" ? Color.White : Color.FromArgb(15, 10, 14);
+
             using var errForm = new Form
             {
                 Text = "ReprediSL V4 - Log Especial de Errores e Incidencias (sync_errors.log)",
                 StartPosition = FormStartPosition.CenterParent,
-                BackColor = Color.FromArgb(24, 15, 20),
+                BackColor = dialogBg,
                 Size = new Size(1050, 650)
             };
 
@@ -651,7 +753,7 @@ namespace ReprediTrayDaemon
             {
                 Dock = DockStyle.Top,
                 Height = 55,
-                BackColor = Color.FromArgb(38, 20, 28)
+                BackColor = topBg
             };
 
             var lblSummary = new Label
@@ -659,7 +761,7 @@ namespace ReprediTrayDaemon
                 Text = $"Resumen de Incidencias: {syncService.ErrorCount} Registradas",
                 Location = new Point(14, 14),
                 AutoSize = true,
-                ForeColor = Color.FromArgb(251, 113, 133),
+                ForeColor = Color.FromArgb(225, 29, 72),
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold)
             };
 
@@ -679,8 +781,8 @@ namespace ReprediTrayDaemon
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                BackColor = Color.FromArgb(15, 10, 14),
-                ForeColor = Color.FromArgb(254, 205, 211),
+                BackColor = textBg,
+                ForeColor = currentTheme == "Claro" ? Color.FromArgb(15, 23, 42) : Color.FromArgb(254, 205, 211),
                 Font = txtLog.Font,
                 BorderStyle = BorderStyle.None
             };
@@ -697,7 +799,7 @@ namespace ReprediTrayDaemon
                             if (string.IsNullOrWhiteSpace(line)) continue;
                             txtErr.SelectionStart = txtErr.TextLength;
                             txtErr.SelectionLength = 0;
-                            txtErr.SelectionColor = line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || line.Contains("Fallo", StringComparison.OrdinalIgnoreCase) ? Color.FromArgb(244, 63, 94) : Color.FromArgb(251, 191, 36);
+                            txtErr.SelectionColor = line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || line.Contains("Fallo", StringComparison.OrdinalIgnoreCase) ? Color.FromArgb(225, 29, 72) : Color.FromArgb(217, 119, 6);
                             txtErr.AppendText(line + Environment.NewLine);
                         }
                     }
@@ -750,34 +852,65 @@ namespace ReprediTrayDaemon
                 e.Cancel = true;
                 this.Hide();
                 trayIcon.ShowBalloonTip(2000, "ReprediSL V4", "El demonio sigue ejecutándose en segundo plano en la barra de tareas.", ToolTipIcon.Info);
-            } base.OnFormClosing(e);
+            }
+            else
+            {
+                base.OnFormClosing(e);
+            }
         }
     }
 
-    // Custom Dark Professional Renderer for ContextMenuStrip (Menú del botón derecho)
+    // Renderizador Claro Personalizado para ContextMenuStrip
+    public class LightMenuRenderer : ToolStripProfessionalRenderer
+    {
+        public LightMenuRenderer() : base(new LightColorTable()) { }
+
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {
+            e.TextColor = e.Item.Enabled ? Color.FromArgb(15, 23, 42) : Color.FromArgb(148, 163, 184);
+            base.OnRenderItemText(e);
+        }
+    }
+
+    public class LightColorTable : ProfessionalColorTable
+    {
+        public override Color MenuItemSelected => Color.FromArgb(226, 232, 240);
+        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(226, 232, 240);
+        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(226, 232, 240);
+        public override Color MenuItemBorder => Color.FromArgb(203, 213, 225);
+        public override Color MenuBorder => Color.FromArgb(203, 213, 225);
+        public override Color ToolStripDropDownBackground => Color.FromArgb(255, 255, 255);
+        public override Color ImageMarginGradientBegin => Color.FromArgb(255, 255, 255);
+        public override Color ImageMarginGradientMiddle => Color.FromArgb(255, 255, 255);
+        public override Color ImageMarginGradientEnd => Color.FromArgb(255, 255, 255);
+        public override Color SeparatorDark => Color.FromArgb(203, 213, 225);
+        public override Color SeparatorLight => Color.Transparent;
+    }
+
+    // Renderizador Oscuro Personalizado para ContextMenuStrip (Letra Blanca 100% Nitida)
     public class DarkMenuRenderer : ToolStripProfessionalRenderer
     {
         public DarkMenuRenderer() : base(new DarkColorTable()) { }
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
-            e.TextColor = e.Item.Enabled ? Color.FromArgb(241, 245, 249) : Color.FromArgb(100, 116, 139);
+            e.TextColor = e.Item.Enabled ? Color.FromArgb(255, 255, 255) : Color.FromArgb(148, 163, 184);
             base.OnRenderItemText(e);
         }
     }
 
     public class DarkColorTable : ProfessionalColorTable
     {
-        public override Color MenuItemSelected => Color.FromArgb(45, 53, 72);
-        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(45, 53, 72);
-        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(45, 53, 72);
+        public override Color MenuItemSelected => Color.FromArgb(51, 65, 85);
+        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(51, 65, 85);
+        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(51, 65, 85);
         public override Color MenuItemBorder => Color.FromArgb(71, 85, 105);
         public override Color MenuBorder => Color.FromArgb(51, 65, 85);
-        public override Color ToolStripDropDownBackground => Color.FromArgb(24, 28, 38);
-        public override Color ImageMarginGradientBegin => Color.FromArgb(24, 28, 38);
-        public override Color ImageMarginGradientMiddle => Color.FromArgb(24, 28, 38);
-        public override Color ImageMarginGradientEnd => Color.FromArgb(24, 28, 38);
-        public override Color SeparatorDark => Color.FromArgb(51, 65, 85);
+        public override Color ToolStripDropDownBackground => Color.FromArgb(30, 41, 59);
+        public override Color ImageMarginGradientBegin => Color.FromArgb(30, 41, 59);
+        public override Color ImageMarginGradientMiddle => Color.FromArgb(30, 41, 59);
+        public override Color ImageMarginGradientEnd => Color.FromArgb(30, 41, 59);
+        public override Color SeparatorDark => Color.FromArgb(71, 85, 105);
         public override Color SeparatorLight => Color.Transparent;
     }
 }
