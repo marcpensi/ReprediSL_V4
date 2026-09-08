@@ -6,7 +6,7 @@
 - **Tipo de aplicación:** Web Application / PWA Móvil Comercial (Ventas)
 - **Lenguaje:** JavaScript (ES6+ / React JSX) / VBA (Microsoft Access)
 - **Framework:** React 18.3.1 + Vite 6.0.5
-- **Versión:** 4.0.0
+- **Versión:** 4.1.0
 - **Ruta local:** `D:\programacio\repredi\ReprediSL_V4`
 
 ## Repositorio

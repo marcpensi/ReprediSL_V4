@@ -1,6 +1,6 @@
 # Arquitectura del Sistema - ReprediSL_V4
 
-**Versión:** 4.0.0  
+**Versión:** 4.1.0  
 **Patrón de Diseño:** Offline-First Decoupled Web Application
 
 ---
