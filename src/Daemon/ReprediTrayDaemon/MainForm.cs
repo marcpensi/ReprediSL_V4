@@ -89,9 +89,21 @@ namespace ReprediTrayDaemon
         private string currentTheme = "Oscuro";     // "Oscuro", "Claro"
         private string settingsFilePath = string.Empty;
 
+        // --- Patrón RJ Code Advance: Gestión de Botón Activo y Arrastre de Ventana ---
+        private Button? currentButton = null;
+        private Random random = new Random();
+        private int tempColorIndex = -1;
+
+        [System.Runtime.InteropServices.DllImport("user32.DLL", EntryPoint = "ReleaseCapture")]
+        private extern static void ReleaseCapture();
+
+        [System.Runtime.InteropServices.DllImport("user32.DLL", EntryPoint = "SendMessage")]
+        private extern static void SendMessage(System.IntPtr hWnd, int wMsg, int wParam, int lParam);
+
         public MainForm()
         {
             this.DoubleBuffered = true;
+            this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
 
             string projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
             if (!File.Exists(Path.Combine(projectRoot, "AGENTS.md")))
@@ -137,6 +149,7 @@ namespace ReprediTrayDaemon
                 Height = 65,
                 Padding = new Padding(16, 8, 16, 8)
             };
+            pnlHeader.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); } };
 
             var picDbIcon = new Label
             {
@@ -153,6 +166,7 @@ namespace ReprediTrayDaemon
                 AutoSize = true,
                 Location = new Point(58, 10)
             };
+            lblHeaderTitle.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); } };
 
             lblHeaderSubtitle = new Label
             {
@@ -571,6 +585,8 @@ namespace ReprediTrayDaemon
             itemSizeMenu.DropDownItems.Add("-");
             itemSizeMenu.DropDownItems.Add("🌞 Modo Claro (Light Theme)", null, (s, e) => ApplyTheme("Claro"));
             itemSizeMenu.DropDownItems.Add("🌙 Modo Oscuro (Dark Theme)", null, (s, e) => ApplyTheme("Oscuro"));
+            itemSizeMenu.DropDownItems.Add("-");
+            itemSizeMenu.DropDownItems.Add("🎨 Cambiar Acento Multicolor (RJ Code Advance)", null, (s, e) => ActivateButton(btnSync));
             trayMenu.Items.Add(itemSizeMenu);
 
             trayMenu.Items.Add("-");
@@ -620,6 +636,51 @@ namespace ReprediTrayDaemon
             };
         }
 
+        private Color SelectRandomThemeColor()
+        {
+            int index = random.Next(ThemeColor.ColorList.Count);
+            while (tempColorIndex == index)
+            {
+                index = random.Next(ThemeColor.ColorList.Count);
+            }
+            tempColorIndex = index;
+            string colorHex = ThemeColor.ColorList[index];
+            return ColorTranslator.FromHtml(colorHex);
+        }
+
+        private void ActivateButton(object btnSender)
+        {
+            if (btnSender is Button btn)
+            {
+                if (currentButton != btn)
+                {
+                    DisableButtons();
+                    Color color = SelectRandomThemeColor();
+                    currentButton = btn;
+                    currentButton.BackColor = color;
+                    currentButton.ForeColor = Color.White;
+                    currentButton.FlatAppearance.BorderColor = ThemeColor.ChangeColorBrightness(color, -0.3);
+                    ThemeColor.PrimaryColor = color;
+                    ThemeColor.SecondaryColor = ThemeColor.ChangeColorBrightness(color, -0.3);
+                }
+            }
+        }
+
+        private void DisableButtons()
+        {
+            if (flowButtons == null) return;
+            foreach (Control control in flowButtons.Controls)
+            {
+                if (control is Button btn && btn.Tag is Color baseColor)
+                {
+                    if (btn == btnAutoToggle && autoAcceptMode) continue;
+                    btn.BackColor = baseColor;
+                    btn.ForeColor = Color.White;
+                    btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
+                }
+            }
+        }
+
         private Button CreatePillButton(string text, Color baseColor, EventHandler onClick, int width = 160)
         {
             var btn = new Button
@@ -632,7 +693,8 @@ namespace ReprediTrayDaemon
                 ForeColor = Color.White,
                 Cursor = Cursors.Hand,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                UseVisualStyleBackColor = false
+                UseVisualStyleBackColor = false,
+                Tag = baseColor
             };
 
             // Borde sutil para dar profundidad
@@ -660,14 +722,20 @@ namespace ReprediTrayDaemon
 
             btn.MouseEnter += (s, e) =>
             {
-                btn.BackColor = hoverColor;
-                btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
+                if (currentButton != btn)
+                {
+                    btn.BackColor = hoverColor;
+                    btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
+                }
             };
 
             btn.MouseLeave += (s, e) =>
             {
-                btn.BackColor = baseColor;
-                btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
+                if (currentButton != btn)
+                {
+                    btn.BackColor = baseColor;
+                    btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
+                }
             };
 
             btn.MouseDown += (s, e) =>
@@ -681,8 +749,17 @@ namespace ReprediTrayDaemon
 
             btn.MouseUp += (s, e) =>
             {
-                btn.BackColor = hoverColor;
-                btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
+                if (currentButton != btn)
+                {
+                    btn.BackColor = hoverColor;
+                    btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
+                }
+            };
+
+            btn.Click += (s, e) =>
+            {
+                ActivateButton(btn);
+                onClick(s, e);
             };
 
             return btn;
@@ -1413,5 +1490,48 @@ namespace ReprediTrayDaemon
         public override Color ImageMarginGradientEnd => Color.FromArgb(30, 41, 59);
         public override Color SeparatorDark => Color.FromArgb(71, 85, 105);
         public override Color SeparatorLight => Color.Transparent;
+    }
+
+    // --- Módulo ThemeColor (Estilo y Paleta Multicolor RJ Code Advance) ---
+    public static class ThemeColor
+    {
+        public static Color PrimaryColor { get; set; } = Color.FromArgb(6, 182, 212);
+        public static Color SecondaryColor { get; set; } = Color.FromArgb(15, 23, 42);
+
+        public static List<string> ColorList = new List<string>
+        {
+            "#06B6D4", // Cyan
+            "#10B981", // Emerald
+            "#6366F1", // Indigo
+            "#8B5CF6", // Violet
+            "#F59E0B", // Amber
+            "#F43F5E", // Rose Red
+            "#0EA5E9", // Sky Blue
+            "#3B82F6", // Royal Blue
+            "#EC4899"  // Pink
+        };
+
+        public static Color ChangeColorBrightness(Color color, double correctionFactor)
+        {
+            double red = color.R;
+            double green = color.G;
+            double blue = color.B;
+
+            if (correctionFactor < 0)
+            {
+                correctionFactor = 1 + correctionFactor;
+                red *= correctionFactor;
+                green *= correctionFactor;
+                blue *= correctionFactor;
+            }
+            else
+            {
+                red = (255 - red) * correctionFactor + red;
+                green = (255 - green) * correctionFactor + green;
+                blue = (255 - blue) * correctionFactor + blue;
+            }
+
+            return Color.FromArgb(color.A, (byte)Math.Clamp((int)red, 0, 255), (byte)Math.Clamp((int)green, 0, 255), (byte)Math.Clamp((int)blue, 0, 255));
+        }
     }
 }
