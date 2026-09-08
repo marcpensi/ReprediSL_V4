@@ -1,12 +1,8 @@
-const CACHE_NAME = 'repredisl-v4-cache-v2';
+const CACHE_NAME = 'repredisl-v4-cache-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './src/main.jsx',
-  './src/styles.css',
-  './src/db.js',
-  './src/clientApi.js',
-  './assets/repredisl-logo.png'
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
