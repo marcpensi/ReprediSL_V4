@@ -48,7 +48,7 @@ Public Function ExportarTablas() As Boolean
 
     On Error GoTo Err_Handler
 
-    RegistrarLogSync "DEBUG STEP 2: Error Handler configurado"
+    RegistrarLogSync "DEBUG STEP 2: Manejador de errores configurado"
     
     ' 1. Asegurar que las consultas y campos necesarios existan en Access
     RegistrarLogSync "DEBUG STEP 3: ActualizarEstructuraAccess..."
@@ -89,11 +89,15 @@ Salir:
     Exit Function
 
 Err_Handler:
+    Dim NumeroError As Long, DescripcionError As String
+    NumeroError = Err.Number
+    DescripcionError = Err.Description
+
     ExportarTablas = False
-    RegistrarLogSync "ERROR IN HANDLER: " & Err.Number & " - " & Err.Description
+    RegistrarLogSync "ERROR IN HANDLER: " & NumeroError & " - " & DescripcionError
     If Application.UserControl Then
         MsgBox "Error durante la exportacion." & vbCrLf & vbCrLf & _
-               "Error " & Err.Number & vbCrLf & Err.Description, _
+               "Error " & NumeroError & vbCrLf & DescripcionError, _
                vbCritical, "PostgreSQL"
     End If
     Resume Salir
@@ -288,7 +292,7 @@ Private Sub RegistrarLogSync(ByVal Mensaje As String)
     Print #fileNum, "[" & Format$(Now, "hh:nn:ss") & "] " & Mensaje
     Close #fileNum
 
-    If InStr(1, Mensaje, "ERROR", vbTextCompare) > 0 Or InStr(1, Mensaje, "Fallo", vbTextCompare) > 0 Then
+    If (InStr(1, Mensaje, "ERROR IN HANDLER", vbTextCompare) > 0 Or InStr(1, Mensaje, "Fallo", vbTextCompare) > 0) And InStr(1, Mensaje, "DEBUG STEP", vbTextCompare) = 0 Then
         errLogPath = CurrentProject.Path & "\sync_errors.log"
         fileNum = FreeFile
         Open errLogPath For Append As #fileNum

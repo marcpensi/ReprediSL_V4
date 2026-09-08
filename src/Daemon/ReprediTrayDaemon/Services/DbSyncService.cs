@@ -120,7 +120,8 @@ namespace ReprediTrayDaemon.Services
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         LogLevel level = LogLevel.Info;
-                        if (line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || line.Contains("Fallo", StringComparison.OrdinalIgnoreCase))
+                        bool isDebugStep = line.Contains("DEBUG STEP", StringComparison.OrdinalIgnoreCase);
+                        if (!isDebugStep && (line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || line.Contains("Fallo", StringComparison.OrdinalIgnoreCase)))
                         {
                             level = LogLevel.Error;
                             ErrorCount++;
