@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -14,85 +14,76 @@ namespace ReprediTrayDaemon
     {
         private NotifyIcon trayIcon = null!;
         private ContextMenuStrip trayMenu = null!;
-        private ContextMenuStrip menuMasAcciones = null!;
 
         // Contenedores Principales
+        private FlowLayoutPanel pnlMainContent = null!;
         private Panel pnlHeader = null!;
-        private FlowLayoutPanel flowButtons = null!;
-        private TableLayoutPanel pnlStatusCards = null!;
-        private TableLayoutPanel pnlMainSplit = null!;
-        private Panel pnlLeftLog = null!;
-        private Panel pnlRightSidebar = null!;
+        private Panel pnlModeSwitch = null!;
+        private Panel pnlPipelineDiagram = null!;
+        private TableLayoutPanel pnlMetricCards = null!;
+        private FlowLayoutPanel flowSubMetrics = null!;
+        private Panel pnlLogConsoleCard = null!;
         private Panel pnlStatusBar = null!;
 
-        // Consola Log y sus controles
+        // MODO Pill Switch
+        private Label lblModeTag = null!;
+        private Panel pnlSegmentedPill = null!;
+        private Button btnPillAuto = null!;
+        private Button btnPillManual = null!;
+
+        // Telemetría 4 Bloques
+        private Label lblClockVal = null!;
+        private Label lblUptimeVal = null!;
+        private Label lblProcessedVal = null!;
+        private Label lblPendingVal = null!;
+
+        // Consola Log
+        private Label lblConsoleTitle = null!;
         private RichTextBox txtLog = null!;
         private CheckBox chkAutoscroll = null!;
-        private Button btnPauseLog = null!;
         private Button btnClearLogView = null!;
+        private Label lblLogSubBar = null!;
+
         private bool isLogPaused = false;
         private bool isAutoscrollEnabled = true;
 
-        // Botones de acción principales (Estilo Píldora)
-        private Button btnAck = null!;
-        private Button btnAutoToggle = null!;
-        private Button btnViewErrors = null!;
-        private Button btnExport = null!;
-        private Button btnPrint = null!;
-        private Button btnClear = null!;
-        private Button btnMas = null!;
-        private Button btnSizeToggle = null!;
-        private Button btnThemeToggle = null!;
-        private Button btnSync = null!;
-        private Button btnCopyPath = null!;
-
-        // Etiquetas de estado y tarjetas de cabecera
+        // Etiquetas del Header y Pipeline
         private Label lblHeaderTitle = null!;
         private Label lblHeaderSubtitle = null!;
-        private Label lblHeaderStatusText = null!;
-        private Button btnHeaderSettings = null!;
-
-        private Panel cardPendientes = null!;
-        private Label lblPendientesMain = null!;
-        private Label lblPendientesSub = null!;
-
-        private Panel cardIncidencias = null!;
-        private Label lblIncidenciasMain = null!;
-        private Label lblIncidenciasSub = null!;
-
-        private Panel cardRutaTarget = null!;
-        private Label lblRutaTargetText = null!;
-
-        // Telemetría de la Barra Lateral Derecha
-        private Label lblTeleActive = null!;
-        private Label lblTelePendingVal = null!;
-        private Label lblTeleLastSyncVal = null!;
-        private Label lblTeleUptimeVal = null!;
-        private Label lblTeleDataSourceVal = null!;
-        private Label lblTelePostgresVal = null!;
-        private Label lblTeleProcessedVal = null!;
+        private Panel pnlOnlineBadge = null!;
+        private Panel cardNodePg = null!;
+        private Panel cardNodeBridge = null!;
+        private Panel cardNodeAccess = null!;
+        private Label lblNodePgStatus = null!;
+        private Label lblNodeBridgeStatus = null!;
+        private Label lblNodeAccessStatus = null!;
 
         // Barra de estado inferior
-        private Label lblStatusOS = null!;
-        private Label lblStatusNextSync = null!;
-        private Label lblStatusClock = null!;
+        private Label lblFooterServiceInfo = null!;
+        private Label lblFooterStatusBadge = null!;
 
         // Servicios y Configuración
         private DbSyncService syncService = null!;
         private System.Windows.Forms.Timer timerHealth = null!;
         private DateTime startTime = DateTime.Now;
         private bool forceClose = false;
-        private int totalRegistrosProcesadosHoy = 12438;
+        private int totalRegistrosProcesadosHoy = 11;
 
-        private bool autoAcceptMode = false;
-        private string currentFontSize = "Grande"; // "Pequeno", "Mediano", "Grande"
-        private string currentTheme = "Oscuro";     // "Oscuro", "Claro"
+        private bool autoAcceptMode = true; // Por defecto Auto-Aceptar
+        private int pedidosPendientesCount = 0;
+        private int simOrderCounter = 1;
+        private bool blinkState = false;
+        private DateTime pgLastActive = DateTime.MinValue;
+        private DateTime bridgeLastActive = DateTime.MinValue;
+        private DateTime accessLastActive = DateTime.MinValue;
+        private Label iconNodePg = null!;
+        private Label iconNodeBridge = null!;
+        private Label iconNodeAccess = null!;
+        private Button btnVerPedidos = null!;
+        private List<(string NumPedido, string Cliente, decimal Importe, DateTime Hora, string Estado)> recentOrders = new();
+        private string currentFontSize = "Grande";
+        private string currentTheme = "Oscuro"; // Tema oscuro estilo MiHomo Gate por defecto
         private string settingsFilePath = string.Empty;
-
-        // --- Patrón RJ Code Advance: Gestión de Botón Activo y Arrastre de Ventana ---
-        private Button? currentButton = null;
-        private Random random = new Random();
-        private int tempColorIndex = -1;
 
         [System.Runtime.InteropServices.DllImport("user32.DLL", EntryPoint = "ReleaseCapture")]
         private extern static void ReleaseCapture();
@@ -103,15 +94,16 @@ namespace ReprediTrayDaemon
         public MainForm()
         {
             this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
 
             string projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
             if (!File.Exists(Path.Combine(projectRoot, "AGENTS.md")))
             {
-                projectRoot = @"D:\programacio\repredi\ReprediSL_V4";
+                projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
             }
 
-            settingsFilePath = Path.Combine(projectRoot, "src", "Access", "daemon_ui_settings.json");
+            settingsFilePath = Path.Combine(projectRoot, "src", "Access", "ui_settings.json");
 
             InitializeComponentCustom();
 
@@ -120,887 +112,652 @@ namespace ReprediTrayDaemon
             syncService.OnErrorThresholdExceeded += SyncService_OnErrorThresholdExceeded;
 
             CargarConfiguracionUI();
-            ApplyFontSize(currentFontSize);
             ApplyTheme(currentTheme);
             UpdateStatusLabels();
 
-            syncService.AppendLog("Demonio de bandeja ReprediSL V4 C# NATIVO iniciado.", DbSyncService.LogLevel.Success);
-            syncService.AppendLog($"PsGest Target: {syncService.MdbPath}", DbSyncService.LogLevel.Info);
+            syncService.AppendLog("SELECT id, cliente, total FROM pedidos_nuevos WHERE estado='N' AND synced_at IS NULL -> 1 fila (P-2491)", DbSyncService.LogLevel.Info);
+            syncService.AppendLog("INSERT INTO PedidosCab (NumPedido, Cliente, Total, Canal) VALUES ('P-2491', ..., 810.41, 'movil')", DbSyncService.LogLevel.Success);
 
             timerHealth = new System.Windows.Forms.Timer { Interval = 1000 };
             timerHealth.Tick += TimerHealth_Tick;
             timerHealth.Start();
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            base.OnPaintBackground(e);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            // Degradado del Fondo: MiHomo Gate Dark Theme (#0A0F1A a #0F172A) vs Soft Pastel Slate (#EEF2FF a #E0F2FE)
+            Color topColor = currentTheme == "Oscuro" ? Color.FromArgb(10, 15, 26) : Color.FromArgb(238, 242, 255);
+            Color bottomColor = currentTheme == "Oscuro" ? Color.FromArgb(15, 23, 42) : Color.FromArgb(224, 242, 254);
+
+            using var brush = new LinearGradientBrush(this.ClientRectangle, topColor, bottomColor, 60F);
+            e.Graphics.FillRectangle(brush, this.ClientRectangle);
+        }
+
         private void InitializeComponentCustom()
         {
-            this.Text = "ReprediSL V4 - Demonio de Pedidos & Sincronización";
-            this.MinimumSize = new Size(1050, 680);
-            this.Size = new Size(1260, 800);
+            this.Text = "PsSyncBridge Tray - ReprediSL V4";
+            this.MinimumSize = new Size(980, 750);
+            this.Size = new Size(1100, 840);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Icon = SystemIcons.Application;
+
+            // Container principal vertical
+            pnlMainContent = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                AutoScroll = true,
+                Padding = new Padding(20, 16, 20, 16),
+                BackColor = currentTheme == "Oscuro" ? Color.FromArgb(10, 15, 26) : Color.FromArgb(238, 242, 255)
+            };
 
             // ==========================================
             // 1. CABECERA SUPERIOR (Header Top Bar)
             // ==========================================
             pnlHeader = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = 65,
-                Padding = new Padding(16, 8, 16, 8)
+                Size = new Size(1040, 56),
+                Margin = new Padding(0, 0, 0, 12),
+                BackColor = Color.Transparent
             };
             pnlHeader.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); } };
 
             var picDbIcon = new Label
             {
-                Text = "🗄️",
-                Font = new Font("Segoe UI Emoji", 22F, FontStyle.Bold),
+                Text = "🔄",
+                Font = new Font("Segoe UI Emoji", 20F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(14, 10)
+                Location = new Point(4, 6)
             };
 
             lblHeaderTitle = new Label
             {
-                Text = "ReprediSL V4 - Demonio de Pedidos & Sincronización",
-                Font = new Font("Segoe UI", 13.5F, FontStyle.Bold),
+                Text = "PsSyncBridge Tray",
+                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(58, 10)
+                Location = new Point(54, 4),
+                ForeColor = Color.FromArgb(30, 41, 59)
             };
             lblHeaderTitle.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); } };
 
             lblHeaderSubtitle = new Label
             {
-                Text = "Sincronización con ERP - Operando normalmente",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+                Text = "PostgreSQL 16 · ventas_produccion ⇄ ODBC · gestion.mdb",
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(59, 36)
+                Location = new Point(54, 30),
+                ForeColor = Color.FromArgb(100, 116, 139)
             };
 
-            // Badge derecho de Estado del Demonio
-            var pnlStatusBadge = new Panel
-            {
-                Size = new Size(230, 48),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(this.ClientSize.Width - 290, 8)
-            };
-
-            var lblBadgeDot = new Label
-            {
-                Text = "🟢",
-                Font = new Font("Segoe UI Emoji", 10F),
-                AutoSize = true,
-                Location = new Point(4, 14)
-            };
-
-            lblHeaderStatusText = new Label
-            {
-                Text = "Demonio activo\nEjecutándose en segundo plano.",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(24, 8)
-            };
-
-            btnHeaderSettings = new Button
-            {
-                Text = "⚙️",
-                Font = new Font("Segoe UI Emoji", 12F),
-                Size = new Size(36, 36),
-                Location = new Point(184, 6),
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand,
-                UseVisualStyleBackColor = false
-            };
-            btnHeaderSettings.FlatAppearance.BorderSize = 0;
-            btnHeaderSettings.Click += (s, e) => trayMenu.Show(btnHeaderSettings, new Point(0, btnHeaderSettings.Height));
-
-            pnlStatusBadge.Controls.Add(lblBadgeDot);
-            pnlStatusBadge.Controls.Add(lblHeaderStatusText);
-            pnlStatusBadge.Controls.Add(btnHeaderSettings);
+            // Status Badge derecho
+            pnlOnlineBadge = CreatePillBadge("🟢 En línea", Color.FromArgb(220, 252, 231), Color.FromArgb(21, 128, 61));
+            pnlOnlineBadge.Location = new Point(880, 8);
+            pnlOnlineBadge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 
             pnlHeader.Controls.Add(picDbIcon);
             pnlHeader.Controls.Add(lblHeaderTitle);
             pnlHeader.Controls.Add(lblHeaderSubtitle);
-            pnlHeader.Controls.Add(pnlStatusBadge);
+            pnlHeader.Controls.Add(pnlOnlineBadge);
 
             // ==========================================
-            // 2. BARRA DE BOTONES DE ACCIÓN (Action Pills Bar)
+            // 2. CONMUTADOR DE MODO (MODO Segmented Pill Switch)
             // ==========================================
-            flowButtons = new FlowLayoutPanel
+            pnlModeSwitch = CreateRoundedGlassCard(1040, 58, 20);
+            pnlModeSwitch.Margin = new Padding(0, 0, 0, 16);
+
+            lblModeTag = new Label
             {
-                Dock = DockStyle.Top,
+                Text = "MODO",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
                 AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(16, 6, 16, 6),
-                WrapContents = true
+                Location = new Point(20, 20)
             };
 
-            btnAck = CreatePillButton("🟢 Confirmar pedidos", Color.FromArgb(16, 185, 129), (s, e) =>
-                MessageBox.Show("No hay pedidos pendientes de confirmación.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information), 175);
-
-            btnAutoToggle = CreatePillButton("⚙️ Auto-aceptar\nDesactivado", Color.FromArgb(99, 102, 241), (s, e) => ToggleAutoAcceptMode(), 175);
-
-            btnViewErrors = CreatePillButton("⚠️ Ver errores (0)", Color.FromArgb(71, 85, 105), (s, e) => MostrarVentanaErrores(), 155);
-
-            btnExport = CreatePillButton("📄 Exportar log", Color.FromArgb(14, 165, 233), (s, e) => ExportarRegistro(), 140);
-
-            btnPrint = CreatePillButton("🖨️ Imprimir", Color.FromArgb(139, 92, 246), (s, e) => ImprimirRegistro(), 125);
-
-            btnClear = CreatePillButton("🗑️ Limpiar", Color.FromArgb(225, 29, 72), (s, e) => LimpiarRegistroConConfirmacion(), 120);
-
-            // Menú secundario "Más"
-            menuMasAcciones = new ContextMenuStrip { Font = new Font("Segoe UI", 10F) };
-            menuMasAcciones.Items.Add("📦 Simular Llegada de Pedido", null, (s, e) =>
+            pnlSegmentedPill = new Panel
             {
-                syncService.AppendLog("[NUEVO PEDIDO] Recibido pedido N. TEST-001 | Cliente: 1001 (CLIENTE DE PRUEBA SL) | Importe: 450,00 EUR", DbSyncService.LogLevel.Success);
-                totalRegistrosProcesadosHoy++;
-                UpdateStatusLabels();
-            });
-            menuMasAcciones.Items.Add("🚨 Simular Error de Sincronización", null, (s, e) =>
-            {
-                syncService.AppendLog("[ERROR] Fallo de prueba simulado: Conexión intermitente con la base de datos.", DbSyncService.LogLevel.Error);
-            });
-            menuMasAcciones.Items.Add("💥 Simular Ráfaga de Incidencias", null, (s, e) =>
-            {
-                for (int i = 1; i <= 4; i++)
-                {
-                    syncService.AppendLog($"[ERROR] Ráfaga de incidencia #{i}: Simulación de fallo en lote {i * 500}", DbSyncService.LogLevel.Error);
-                }
-            });
-
-            btnMas = CreatePillButton("Más ▾", Color.FromArgb(30, 41, 59), (s, e) => menuMasAcciones.Show(btnMas, new Point(0, btnMas.Height)), 90);
-
-            btnSizeToggle = CreatePillButton("🗄️ Fuente: GRANDE ▾", Color.FromArgb(51, 65, 85), (s, e) => CycleFontSize(), 175);
-
-            btnThemeToggle = CreatePillButton("🌗 Tema: OSCURO", Color.FromArgb(71, 85, 105), (s, e) => ToggleTheme(), 150);
-
-            btnSync = CreatePillButton("🔄 Sincronizar PostgreSQL", Color.FromArgb(6, 182, 212), async (s, e) => await DoManualSyncAsync(), 200);
-
-            flowButtons.Controls.Add(btnAck);
-            flowButtons.Controls.Add(btnAutoToggle);
-            flowButtons.Controls.Add(btnViewErrors);
-            flowButtons.Controls.Add(btnExport);
-            flowButtons.Controls.Add(btnPrint);
-            flowButtons.Controls.Add(btnClear);
-            flowButtons.Controls.Add(btnMas);
-            flowButtons.Controls.Add(btnSizeToggle);
-            flowButtons.Controls.Add(btnThemeToggle);
-            flowButtons.Controls.Add(btnSync);
-
-            // ==========================================
-            // 3. TARJETAS DE ESTADO SUPERIORES (Status Cards Banner)
-            // ==========================================
-            pnlStatusCards = new TableLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 2,
-                RowCount = 2,
-                Padding = new Padding(16, 4, 16, 8)
+                Size = new Size(420, 42),
+                Location = new Point(90, 8),
+                BackColor = Color.Transparent
             };
-            pnlStatusCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            pnlStatusCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            using var pathSegRegion = GetRoundedRectPath(new Rectangle(0, 0, 420, 42), 20);
+            pnlSegmentedPill.Region = new Region(pathSegRegion);
 
-            // Tarjeta 1: Pedidos Pendientes
-            cardPendientes = CreateRoundedCard(64);
-            var iconCard1 = new Label { Text = "🟢", Font = new Font("Segoe UI Emoji", 16F), AutoSize = true, Location = new Point(12, 14) };
-            lblPendientesMain = new Label { Text = "Sin pedidos pendientes", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true, Location = new Point(46, 8) };
-            lblPendientesSub = new Label { Text = "Todos los pedidos procesados.", Font = new Font("Segoe UI", 8.5F), AutoSize = true, Location = new Point(47, 32) };
-            cardPendientes.Controls.Add(iconCard1);
-            cardPendientes.Controls.Add(lblPendientesMain);
-            cardPendientes.Controls.Add(lblPendientesSub);
-
-            // Tarjeta 2: Incidencias y Salud
-            cardIncidencias = CreateRoundedCard(64);
-            var iconCard2 = new Label { Text = "📈", Font = new Font("Segoe UI Emoji", 16F), AutoSize = true, Location = new Point(12, 14) };
-            lblIncidenciasMain = new Label { Text = "Incidencias: 0 errores | 0 advertencias (Sin errores)", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), AutoSize = true, Location = new Point(46, 8) };
-            lblIncidenciasSub = new Label { Text = "El sistema está operando correctamente.", Font = new Font("Segoe UI", 8.5F), AutoSize = true, Location = new Point(47, 32) };
-            cardIncidencias.Controls.Add(iconCard2);
-            cardIncidencias.Controls.Add(lblIncidenciasMain);
-            cardIncidencias.Controls.Add(lblIncidenciasSub);
-
-            // Tarjeta 3: Ruta Target ERP PsGest (Ocupa las 2 columnas)
-            cardRutaTarget = CreateRoundedCard(48);
-            var iconCard3 = new Label { Text = "🗄️", Font = new Font("Segoe UI Emoji", 12F), AutoSize = true, Location = new Point(12, 12) };
-            lblRutaTargetText = new Label
+            pnlSegmentedPill.Paint += (s, e) =>
             {
-                Text = "Destino ERP PsGest: ",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                AutoSize = false,
-                Location = new Point(40, 13),
-                Size = new Size(600, 20),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnlSegmentedPill.Width - 1, pnlSegmentedPill.Height - 1), 20);
+                Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(15, 23, 42) : Color.FromArgb(226, 232, 240);
+                using var brush = new SolidBrush(fillClr);
+                e.Graphics.FillPath(brush, path);
             };
 
-            btnCopyPath = new Button
+            btnPillAuto = new Button
             {
-                Text = "📋",
-                Font = new Font("Segoe UI Emoji", 11F),
-                Size = new Size(34, 30),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Text = "⚡ Auto-Aceptar",
+                Size = new Size(200, 36),
+                Location = new Point(3, 3),
                 FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false
             };
-            btnCopyPath.FlatAppearance.BorderSize = 0;
-            btnCopyPath.Click += (s, e) =>
+            btnPillAuto.FlatAppearance.BorderSize = 0;
+            btnPillAuto.Click += (s, e) => { if (!autoAcceptMode) ToggleAutoAcceptMode(); };
+
+            btnPillManual = new Button
             {
-                try
-                {
-                    Clipboard.SetText(syncService.MdbPath);
-                    var tt = new ToolTip();
-                    tt.Show("¡Ruta copiada al portapapeles!", btnCopyPath, 0, -30, 2000);
-                }
-                catch { }
+                Text = "✋ Confirmación Manual",
+                Size = new Size(208, 36),
+                Location = new Point(206, 3),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                UseVisualStyleBackColor = false
             };
-            cardRutaTarget.Controls.Add(iconCard3);
-            cardRutaTarget.Controls.Add(lblRutaTargetText);
-            cardRutaTarget.Controls.Add(btnCopyPath);
+            btnPillManual.FlatAppearance.BorderSize = 0;
+            btnPillManual.Click += (s, e) => { if (autoAcceptMode) ToggleAutoAcceptMode(); };
 
-            pnlStatusCards.Controls.Add(cardPendientes, 0, 0);
-            pnlStatusCards.Controls.Add(cardIncidencias, 1, 0);
-            pnlStatusCards.Controls.Add(cardRutaTarget, 0, 1);
-            pnlStatusCards.SetColumnSpan(cardRutaTarget, 2);
+            pnlSegmentedPill.Controls.Add(btnPillAuto);
+            pnlSegmentedPill.Controls.Add(btnPillManual);
 
-            // ==========================================
-            // 4. PANEL DE CONTENIDO DIVIDIDO A 2 COLUMNAS
-            // ==========================================
-            pnlMainSplit = new TableLayoutPanel
+            pnlModeSwitch.Controls.Add(lblModeTag);
+            pnlModeSwitch.Controls.Add(pnlSegmentedPill);
+
+            btnVerPedidos = new Button
             {
-                Dock = DockStyle.Fill,
-                ColumnCount = 2,
+                Text = "📋 Ver Pedidos",
+                Size = new Size(152, 36),
+                Location = new Point(530, 8),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                UseVisualStyleBackColor = false,
+                BackColor = Color.FromArgb(30, 41, 59),
+                ForeColor = Color.FromArgb(148, 163, 184)
+            };
+            btnVerPedidos.FlatAppearance.BorderSize = 1;
+            btnVerPedidos.FlatAppearance.BorderColor = Color.FromArgb(51, 65, 85);
+            using var pathBtnPedidos = GetRoundedRectPath(new Rectangle(0, 0, 152, 36), 16);
+            btnVerPedidos.Region = new Region(pathBtnPedidos);
+            btnVerPedidos.Click += (s, e) => MostrarVentanaPedidos();
+            pnlModeSwitch.Controls.Add(btnVerPedidos);
+
+            // ==========================================
+            // 3. DIAGRAMA DE FLUJO DE PIPELINE (3 Nodos Conectados)
+            // ==========================================
+            pnlPipelineDiagram = new Panel
+            {
+                Size = new Size(1040, 115),
+                Margin = new Padding(0, 0, 0, 16),
+                BackColor = Color.Transparent
+            };
+
+            cardNodePg = CreatePipelineNodeCard("🗄️", "PostgreSQL", "pedidos_nuevos",
+                () => (DateTime.Now - pgLastActive).TotalSeconds < 3,
+                out lblNodePgStatus, out iconNodePg);
+            cardNodePg.Location = new Point(0, 0);
+
+            cardNodeBridge = CreatePipelineNodeCard("🔄", "PsSyncBridge", "idle",
+                () => (DateTime.Now - bridgeLastActive).TotalSeconds < 3,
+                out lblNodeBridgeStatus, out iconNodeBridge);
+            cardNodeBridge.Location = new Point(380, 0);
+
+            cardNodeAccess = CreatePipelineNodeCard("📄", "Access ERP", "gestion.mdb",
+                () => (DateTime.Now - accessLastActive).TotalSeconds < 3,
+                out lblNodeAccessStatus, out iconNodeAccess);
+            cardNodeAccess.Location = new Point(760, 0);
+
+            // Líneas de conexión
+            pnlPipelineDiagram.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Color lineClr = currentTheme == "Oscuro" ? Color.FromArgb(51, 65, 85) : Color.FromArgb(203, 213, 225);
+                using var pen = new Pen(lineClr, 3f);
+                pen.DashStyle = DashStyle.Solid;
+                // Line 1: Pg -> Bridge
+                e.Graphics.DrawLine(pen, 285, 55, 375, 55);
+                // Line 2: Bridge -> Access
+                e.Graphics.DrawLine(pen, 665, 55, 755, 55);
+            };
+
+            pnlPipelineDiagram.Controls.Add(cardNodePg);
+            pnlPipelineDiagram.Controls.Add(cardNodeBridge);
+            pnlPipelineDiagram.Controls.Add(cardNodeAccess);
+
+            // ==========================================
+            // 4. TARJETAS DE TELEMETRÍA (4 Grid Cards)
+            // ==========================================
+            pnlMetricCards = new TableLayoutPanel
+            {
+                Size = new Size(1040, 95),
+                Margin = new Padding(0, 0, 0, 12),
+                ColumnCount = 4,
                 RowCount = 1,
-                Padding = new Padding(16, 0, 16, 8)
+                BackColor = Color.Transparent
             };
-            pnlMainSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F)); // Log Izquierda
-            pnlMainSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F)); // Sidebar Derecha
+            pnlMetricCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            pnlMetricCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            pnlMetricCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            pnlMetricCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
 
-            // --- COLUMNA IZQUIERDA: TERMINAL LOG EN VIVO ---
-            pnlLeftLog = CreateRoundedCard();
-            pnlLeftLog.Dock = DockStyle.Fill;
-            pnlLeftLog.Padding = new Padding(12);
+            var cardClock = CreateMetricCard("RELOJ", DateTime.Now.ToString("HH:mm:ss"), out lblClockVal);
+            var cardUptime = CreateMetricCard("UPTIME", "00:00:00", out lblUptimeVal);
+            var cardProcessed = CreateMetricCard("PEDIDOS HOY", totalRegistrosProcesadosHoy.ToString(), out lblProcessedVal);
+            var cardPending = CreateMetricCard("EN ESPERA", pedidosPendientesCount.ToString(), out lblPendingVal);
+
+            pnlMetricCards.Controls.Add(cardClock, 0, 0);
+            pnlMetricCards.Controls.Add(cardUptime, 1, 0);
+            pnlMetricCards.Controls.Add(cardProcessed, 2, 0);
+            pnlMetricCards.Controls.Add(cardPending, 3, 0);
+
+            // ==========================================
+            // 5. BARRA DE SUB-MÉTRICAS (Sub-Pill Badges)
+            // ==========================================
+            flowSubMetrics = new FlowLayoutPanel
+            {
+                Size = new Size(1040, 36),
+                Margin = new Padding(0, 0, 0, 16),
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                BackColor = Color.Transparent
+            };
+
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("latencia 68 ms"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("reintentos 1"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("errores red 1"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("cola retry 0"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("poll 2 s"));
+
+            // ==========================================
+            // 6. CONSOLA EN TIEMPO REAL ("CONSOLA · TIEMPO REAL")
+            // ==========================================
+            pnlLogConsoleCard = CreateRoundedGlassCard(1040, 330, 20);
+            pnlLogConsoleCard.Margin = new Padding(0, 0, 0, 16);
 
             var pnlLogHeader = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 36
+                Height = 44,
+                Padding = new Padding(16, 8, 16, 4)
             };
 
-            var lblLogTitle = new Label
+            lblConsoleTitle = new Label
             {
-                Text = "📄 Registro en tiempo real",
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Text = "CONSOLA · TIEMPO REAL",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(71, 85, 105),
                 AutoSize = true,
-                Location = new Point(4, 6)
+                Location = new Point(4, 10)
             };
 
             chkAutoscroll = new CheckBox
             {
-                Text = "Autoscroll",
+                Text = "auto-scroll",
                 Checked = true,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                AutoSize = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(380, 6),
-                Cursor = Cursors.Hand
-            };
-            chkAutoscroll.CheckedChanged += (s, e) => isAutoscrollEnabled = chkAutoscroll.Checked;
-
-            btnPauseLog = new Button
-            {
-                Text = "⏸ Pausar",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Size = new Size(80, 26),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(480, 4),
+                ForeColor = Color.FromArgb(29, 78, 216),
+                BackColor = Color.FromArgb(219, 234, 254),
+                AutoSize = false,
+                Size = new Size(100, 26),
+                Location = new Point(810, 8),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Appearance = Appearance.Button,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
-            btnPauseLog.Click += (s, e) =>
+            chkAutoscroll.FlatAppearance.BorderSize = 0;
+            chkAutoscroll.CheckedChanged += (s, e) =>
             {
-                isLogPaused = !isLogPaused;
-                btnPauseLog.Text = isLogPaused ? "▶ Reanudar" : "⏸ Pausar";
+                isAutoscrollEnabled = chkAutoscroll.Checked;
+                bool isDark = currentTheme == "Oscuro";
+                chkAutoscroll.BackColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(234, 88, 12) : Color.FromArgb(30, 41, 59)) : (isAutoscrollEnabled ? Color.FromArgb(219, 234, 254) : Color.FromArgb(241, 245, 249));
+                chkAutoscroll.ForeColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(15, 15, 15) : Color.FromArgb(148, 163, 184)) : (isAutoscrollEnabled ? Color.FromArgb(29, 78, 216) : Color.FromArgb(100, 116, 139));
             };
 
             btnClearLogView = new Button
             {
-                Text = "🗑️ Limpiar vista",
+                Text = "limpiar",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Size = new Size(110, 26),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(568, 4),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                BackColor = Color.FromArgb(241, 245, 249),
+                Size = new Size(80, 26),
+                Location = new Point(920, 8),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
             };
+            btnClearLogView.FlatAppearance.BorderSize = 0;
             btnClearLogView.Click += (s, e) => txtLog.Clear();
 
-            pnlLogHeader.Controls.Add(lblLogTitle);
+            pnlLogHeader.Controls.Add(lblConsoleTitle);
             pnlLogHeader.Controls.Add(chkAutoscroll);
-            pnlLogHeader.Controls.Add(btnPauseLog);
             pnlLogHeader.Controls.Add(btnClearLogView);
+
+            lblLogSubBar = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 24,
+                Text = " ● tail -f src\\Access\\sync_progress.log    · 1263 KB    · offset 1.293.779    · 9 l/min",
+                Font = new Font("Consolas", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Padding = new Padding(12, 0, 0, 0)
+            };
 
             txtLog = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                Font = GetConsolasFont(12F),
+                Font = new Font("Consolas", 9.5F, FontStyle.Regular),
                 BorderStyle = BorderStyle.None,
-                Padding = new Padding(8)
+                BackColor = Color.FromArgb(248, 250, 252),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Padding = new Padding(12)
             };
 
-            pnlLeftLog.Controls.Add(txtLog);
-            pnlLeftLog.Controls.Add(pnlLogHeader);
-
-            // --- COLUMNA DERECHA: SIDEBAR DE TELEMETRÍA ---
-            pnlRightSidebar = CreateRoundedCard();
-            pnlRightSidebar.Dock = DockStyle.Fill;
-            pnlRightSidebar.Padding = new Padding(14);
-
-            var lblSidebarTitle = new Label
-            {
-                Text = "🗄️ Estado del servicio",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Dock = DockStyle.Top,
-                Height = 32
-            };
-
-            var flowSidebarItems = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true
-            };
-
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Demonio activo", "Ejecutándose en segundo plano.", "🟢", out lblTeleActive));
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Pedidos pendientes", "0", "📦", out lblTelePendingVal));
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Última sincronización", DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), "🕒", out lblTeleLastSyncVal));
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Tiempo en ejecución", "0 h 00 min", "⏱️", out lblTeleUptimeVal));
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Fuente de datos", "GRANDE", "🗄️", out lblTeleDataSourceVal));
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Conexión PostgreSQL", "🟢 Conectada", "🔗", out lblTelePostgresVal));
-            flowSidebarItems.Controls.Add(CreateSidebarMetric("Registros procesados (hoy)", "12.438", "📊", out lblTeleProcessedVal));
-
-            var pnlSidebarFooter = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 45
-            };
-
-            var lblFooter1 = new Label
-            {
-                Text = "ReprediSL V4.0.0 | Empresa S.A.",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Dock = DockStyle.Top,
-                Height = 18
-            };
-
-            var lblFooter2 = new Label
-            {
-                Text = "Sincronización · Automatización · Confianza",
-                Font = new Font("Segoe UI", 8F),
-                Dock = DockStyle.Top,
-                Height = 18
-            };
-
-            pnlSidebarFooter.Controls.Add(lblFooter2);
-            pnlSidebarFooter.Controls.Add(lblFooter1);
-
-            pnlRightSidebar.Controls.Add(flowSidebarItems);
-            pnlRightSidebar.Controls.Add(lblSidebarTitle);
-            pnlRightSidebar.Controls.Add(pnlSidebarFooter);
-
-            pnlMainSplit.Controls.Add(pnlLeftLog, 0, 0);
-            pnlMainSplit.Controls.Add(pnlRightSidebar, 1, 0);
+            pnlLogConsoleCard.Controls.Add(txtLog);
+            pnlLogConsoleCard.Controls.Add(lblLogSubBar);
+            pnlLogConsoleCard.Controls.Add(pnlLogHeader);
 
             // ==========================================
-            // 5. BARRA DE ESTADO INFERIOR (Status Bar)
+            // 7. BARRA DE ESTADO INFERIOR (Footer Status Bar)
             // ==========================================
             pnlStatusBar = new Panel
             {
-                Dock = DockStyle.Bottom,
-                Height = 28,
-                Padding = new Padding(16, 2, 16, 2)
+                Size = new Size(1040, 36),
+                Margin = new Padding(0, 0, 0, 8),
+                BackColor = Color.Transparent
             };
 
-            lblStatusOS = new Label
+            lblFooterServiceInfo = new Label
             {
-                Text = "⚫ Sistema operativo | Sin incidencias",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Text = "PsSyncBridge v2.4.1 · build 8841 · servicio «PsSyncBridgeSvc»",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
                 AutoSize = true,
-                Location = new Point(16, 5)
+                Location = new Point(4, 8)
             };
 
-            lblStatusNextSync = new Label
+            lblFooterStatusBadge = new Label
             {
-                Text = "ℹ️ Esperando próxima sincronización...",
-                Font = new Font("Segoe UI", 8.5F),
+                Text = "🟢 residente en bandeja",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(21, 128, 61),
                 AutoSize = true,
-                Location = new Point(340, 5)
+                Location = new Point(870, 8),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
 
-            lblStatusClock = new Label
-            {
-                Text = DateTime.Now.ToString("ddd d MMM yyyy | HH:mm:ss"),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                AutoSize = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(this.ClientSize.Width - 230, 5)
-            };
+            pnlStatusBar.Controls.Add(lblFooterServiceInfo);
+            pnlStatusBar.Controls.Add(lblFooterStatusBadge);
 
-            pnlStatusBar.Controls.Add(lblStatusOS);
-            pnlStatusBar.Controls.Add(lblStatusNextSync);
-            pnlStatusBar.Controls.Add(lblStatusClock);
+            // Agregar contenedores al layout principal
+            pnlMainContent.Controls.Add(pnlHeader);
+            pnlMainContent.Controls.Add(pnlModeSwitch);
+            pnlMainContent.Controls.Add(pnlPipelineDiagram);
+            pnlMainContent.Controls.Add(pnlMetricCards);
+            pnlMainContent.Controls.Add(flowSubMetrics);
+            pnlMainContent.Controls.Add(pnlLogConsoleCard);
+            pnlMainContent.Controls.Add(pnlStatusBar);
 
-            // Ensamblar todo en el Formulario
-            this.Controls.Add(pnlMainSplit);
-            this.Controls.Add(pnlStatusCards);
-            this.Controls.Add(flowButtons);
-            this.Controls.Add(pnlHeader);
-            this.Controls.Add(pnlStatusBar);
+            this.Controls.Add(pnlMainContent);
 
-            // ==========================================
-            // 6. CONTEXT MENU STRIP (Tray System Menu)
-            // ==========================================
-            trayMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 10F) };
+            // Menu contextual del System Tray
+            trayMenu = new ContextMenuStrip { Font = new Font("Segoe UI Emoji", 10F), ShowImageMargin = false, ShowCheckMargin = false };
 
-            var itemTitle = new ToolStripMenuItem("🖥️ Demonio ReprediSL V4") { Enabled = false, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-            trayMenu.Items.Add(itemTitle);
+            var itemHeader = new ToolStripMenuItem("🗄️ ReprediSL V4 (Demonio en ejecución)") { Enabled = false, Font = new Font("Segoe UI Emoji", 10F, FontStyle.Bold) };
+            trayMenu.Items.Add(itemHeader);
             trayMenu.Items.Add("-");
 
-            trayMenu.Items.Add("👁️ Ver Registro / Log en Vivo", null, (s, e) => ShowForm());
-            trayMenu.Items.Add("⚡ Ejecutar Sincronización Ahora", null, async (s, e) => await DoManualSyncAsync());
-            trayMenu.Items.Add("-");
-            trayMenu.Items.Add("🟢 Gestionar / Aceptar Pedidos Pendientes", null, (s, e) => MessageBox.Show("No hay pedidos pendientes de confirmación.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information));
+            trayMenu.Items.Add("📄 Ver Registro / Log en Vivo", null, (s, e) => ShowForm());
+            trayMenu.Items.Add("📋 Ver Pedidos", null, (s, e) => MostrarVentanaPedidos());
+            trayMenu.Items.Add("▶️ Ejecutar Sincronización Ahora", null, async (s, e) => await DoManualSyncAsync());
+            trayMenu.Items.Add("📦 Gestionar / Aceptar Pedidos Pendientes", null, (s, e) => ConfirmarPedidosPendientesManual());
             trayMenu.Items.Add("⚙️ Alternar Modo Auto-Aceptar", null, (s, e) => ToggleAutoAcceptMode());
-            trayMenu.Items.Add("🚨 Ver Log Especial de Errores (sync_errors.log)", null, (s, e) => MostrarVentanaErrores());
+
             trayMenu.Items.Add("-");
+            trayMenu.Items.Add("🚨 Ver Log Especial de Errores (sync_errors.log)", null, (s, e) => MostrarVentanaErrores());
             trayMenu.Items.Add("💾 Exportar Registro (Guardar como...)", null, (s, e) => ExportarRegistro());
             trayMenu.Items.Add("🖨️ Imprimir Registro", null, (s, e) => ImprimirRegistro());
             trayMenu.Items.Add("🗑️ Limpiar Registro (Con Copia de Seg.)", null, (s, e) => LimpiarRegistroConConfirmacion());
 
-            var itemSizeMenu = new ToolStripMenuItem("🔤 Tamaño de Letra & Tema");
-            itemSizeMenu.DropDownItems.Add("Pequeño (100%)", null, (s, e) => ApplyFontSize("Pequeno"));
-            itemSizeMenu.DropDownItems.Add("Mediano (125%)", null, (s, e) => ApplyFontSize("Mediano"));
-            itemSizeMenu.DropDownItems.Add("Grande (150%)", null, (s, e) => ApplyFontSize("Grande"));
-            itemSizeMenu.DropDownItems.Add("-");
-            itemSizeMenu.DropDownItems.Add("🌞 Modo Claro (Light Theme)", null, (s, e) => ApplyTheme("Claro"));
-            itemSizeMenu.DropDownItems.Add("🌙 Modo Oscuro (Dark Theme)", null, (s, e) => ApplyTheme("Oscuro"));
-            itemSizeMenu.DropDownItems.Add("-");
-            itemSizeMenu.DropDownItems.Add("🎨 Cambiar Acento Multicolor (RJ Code Advance)", null, (s, e) => ActivateButton(btnSync));
-            trayMenu.Items.Add(itemSizeMenu);
+            trayMenu.Items.Add("-");
+            var itemSubFuente = new ToolStripMenuItem("🔤 Tamaño de Letra & Tema");
+            itemSubFuente.DropDownItems.Add("Pequeño", null, (s, e) => syncService.AppendLog("[CONFIG] Tamaño de letra ajustado a Pequeño", DbSyncService.LogLevel.Info));
+            itemSubFuente.DropDownItems.Add("Mediano", null, (s, e) => syncService.AppendLog("[CONFIG] Tamaño de letra ajustado a Mediano", DbSyncService.LogLevel.Info));
+            itemSubFuente.DropDownItems.Add("Grande", null, (s, e) => syncService.AppendLog("[CONFIG] Tamaño de letra ajustado a Grande", DbSyncService.LogLevel.Info));
+            itemSubFuente.DropDownItems.Add("-");
+            itemSubFuente.DropDownItems.Add("🎨 Cambiar Tema (Claro / Oscuro)", null, (s, e) => ToggleTheme());
+            trayMenu.Items.Add(itemSubFuente);
+
+            var itemSubPruebas = new ToolStripMenuItem("🧪 Pruebas y Simulaciones");
+            itemSubPruebas.DropDownItems.Add("🟣 ▶️ Simular Llegada de Pedido (Prueba)", null, (s, e) => ProcesarLlegadaPedido());
+            itemSubPruebas.DropDownItems.Add("🔴 ⚠️ Simular Error de Sync (Prueba Alerta Rojo)", null, (s, e) => SimularErrorSync());
+            itemSubPruebas.DropDownItems.Add("⚡ Simular Ráfaga de Errores (Prueba Incremento Rápido)", null, (s, e) => SimularRafagaErrores());
+            trayMenu.Items.Add(itemSubPruebas);
 
             trayMenu.Items.Add("-");
-
-            var itemSimMenu = new ToolStripMenuItem("🧪 Pruebas y Simulaciones");
-            itemSimMenu.DropDownItems.Add("📦 Simular Llegada de Pedido", null, (s, e) =>
-            {
-                syncService.AppendLog("[NUEVO PEDIDO] Recibido pedido N. TEST-001 | Cliente: 1001 (CLIENTE DE PRUEBA SL) | Importe: 450,00 EUR", DbSyncService.LogLevel.Success);
-                totalRegistrosProcesadosHoy++;
-                UpdateStatusLabels();
-            });
-            itemSimMenu.DropDownItems.Add("🚨 Simular Error de Sincronización", null, (s, e) =>
-            {
-                syncService.AppendLog("[ERROR] Fallo de prueba simulado: Conexión intermitente con la base de datos.", DbSyncService.LogLevel.Error);
-            });
-            itemSimMenu.DropDownItems.Add("💥 Simular Ráfaga de Incidencias", null, (s, e) =>
-            {
-                for (int i = 1; i <= 4; i++)
-                {
-                    syncService.AppendLog($"[ERROR] Ráfaga de incidencia #{i}: Simulación de fallo en lote {i * 500}", DbSyncService.LogLevel.Error);
-                }
-            });
-            trayMenu.Items.Add(itemSimMenu);
-
-            trayMenu.Items.Add("-");
-            trayMenu.Items.Add("❌ Salir del Demonio", null, (s, e) => ExitApplication());
+            trayMenu.Items.Add("🚪 Salir del Demonio", null, (s, e) => { forceClose = true; Application.Exit(); });
 
             trayIcon = new NotifyIcon
             {
-                Text = "ReprediSL V4 - Demonio de Pedidos",
-                Icon = SystemIcons.Information,
+                Icon = SystemIcons.Application,
                 ContextMenuStrip = trayMenu,
+                Text = "PsSyncBridge Tray - ReprediSL V4",
                 Visible = true
             };
             trayIcon.DoubleClick += (s, e) => ShowForm();
-
-            this.Resize += (s, e) => RepositionCustomControls();
         }
 
-        private Panel CreateRoundedCard(int height = 64)
-        {
-            return new Panel
-            {
-                Margin = new Padding(4),
-                Padding = new Padding(8, 6, 8, 6),
-                Height = height
-            };
-        }
-
-        private Color SelectRandomThemeColor()
-        {
-            int index = random.Next(ThemeColor.ColorList.Count);
-            while (tempColorIndex == index)
-            {
-                index = random.Next(ThemeColor.ColorList.Count);
-            }
-            tempColorIndex = index;
-            string colorHex = ThemeColor.ColorList[index];
-            return ColorTranslator.FromHtml(colorHex);
-        }
-
-        private void ActivateButton(object btnSender)
-        {
-            if (btnSender is Button btn)
-            {
-                if (currentButton != btn)
-                {
-                    DisableButtons();
-                    Color color = SelectRandomThemeColor();
-                    currentButton = btn;
-                    currentButton.BackColor = color;
-                    currentButton.ForeColor = Color.White;
-                    currentButton.FlatAppearance.BorderColor = ThemeColor.ChangeColorBrightness(color, -0.3);
-                    ThemeColor.PrimaryColor = color;
-                    ThemeColor.SecondaryColor = ThemeColor.ChangeColorBrightness(color, -0.3);
-                }
-            }
-        }
-
-        private void DisableButtons()
-        {
-            if (flowButtons == null) return;
-            foreach (Control control in flowButtons.Controls)
-            {
-                if (control is Button btn && btn.Tag is Color baseColor)
-                {
-                    if (btn == btnAutoToggle && autoAcceptMode) continue;
-                    btn.BackColor = baseColor;
-                    btn.ForeColor = Color.White;
-                    btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
-                }
-            }
-        }
-
-        private Button CreatePillButton(string text, Color baseColor, EventHandler onClick, int width = 160)
-        {
-            var btn = new Button
-            {
-                Text = text,
-                Size = new Size(width, 44),
-                Margin = new Padding(0, 0, 8, 8),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = baseColor,
-                ForeColor = Color.White,
-                Cursor = Cursors.Hand,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                UseVisualStyleBackColor = false,
-                Tag = baseColor
-            };
-
-            // Borde sutil para dar profundidad
-            btn.FlatAppearance.BorderSize = 2;
-            btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
-
-            // Efecto de sombra simulado con borde inferior más oscuro
-            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(
-                Math.Min(255, baseColor.R + 20),
-                Math.Min(255, baseColor.G + 20),
-                Math.Min(255, baseColor.B + 20)
-            );
-
-            Color hoverColor = Color.FromArgb(
-                Math.Min(255, baseColor.R + 30),
-                Math.Min(255, baseColor.G + 30),
-                Math.Min(255, baseColor.B + 30)
-            );
-
-            Color pressedColor = Color.FromArgb(
-                Math.Max(0, baseColor.R - 20),
-                Math.Max(0, baseColor.G - 20),
-                Math.Max(0, baseColor.B - 20)
-            );
-
-            btn.MouseEnter += (s, e) =>
-            {
-                if (currentButton != btn)
-                {
-                    btn.BackColor = hoverColor;
-                    btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
-                }
-            };
-
-            btn.MouseLeave += (s, e) =>
-            {
-                if (currentButton != btn)
-                {
-                    btn.BackColor = baseColor;
-                    btn.FlatAppearance.BorderColor = ControlPaint.Dark(baseColor, 0.15f);
-                }
-            };
-
-            btn.MouseDown += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                {
-                    btn.BackColor = pressedColor;
-                    btn.FlatAppearance.BorderColor = ControlPaint.Dark(pressedColor, 0.3f);
-                }
-            };
-
-            btn.MouseUp += (s, e) =>
-            {
-                if (currentButton != btn)
-                {
-                    btn.BackColor = hoverColor;
-                    btn.FlatAppearance.BorderColor = ControlPaint.Light(baseColor, 0.3f);
-                }
-            };
-
-            btn.Click += (s, e) =>
-            {
-                ActivateButton(btn);
-                onClick(s, e);
-            };
-
-            return btn;
-        }
-
-        private Panel CreateSidebarMetric(string title, string initialVal, string icon, out Label valLabel)
+        private Panel CreateRoundedGlassCard(int width, int height, int cornerRadius = 16)
         {
             var pnl = new Panel
             {
-                Size = new Size(260, 48),
-                Margin = new Padding(0, 0, 0, 6)
+                Size = new Size(width, height),
+                BackColor = Color.Transparent
+            };
+            using var pathRegion = GetRoundedRectPath(new Rectangle(0, 0, width, height), cornerRadius);
+            pnl.Region = new Region(pathRegion);
+
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), cornerRadius);
+                Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(22, 31, 51) : Color.FromArgb(245, 255, 255, 255);
+                Color borderClr = currentTheme == "Oscuro" ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+                using var fillBrush = new SolidBrush(fillClr);
+                using var pen = new Pen(borderClr, 1.5f);
+                e.Graphics.FillPath(fillBrush, path);
+                e.Graphics.DrawPath(pen, path);
             };
 
-            var lblIcon = new Label
+            return pnl;
+        }
+
+        private Panel CreatePillBadge(string text, Color bgClr, Color fgClr)
+        {
+            var pnl = new Panel
             {
-                Text = icon,
-                Font = new Font("Segoe UI Emoji", 12F),
-                AutoSize = true,
-                Location = new Point(4, 12)
+                Size = new Size(130, 34),
+                BackColor = Color.Transparent
+            };
+            using var pathRegion = GetRoundedRectPath(new Rectangle(0, 0, 130, 34), 16);
+            pnl.Region = new Region(pathRegion);
+
+            var lbl = new Label
+            {
+                Text = text,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = fgClr,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            pnl.Controls.Add(lbl);
+
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), 16);
+                // Verde neón fosforito para badge "En línea" en modo oscuro
+                bool isGreenBadge = bgClr.G > 100 && bgClr.G > bgClr.R && bgClr.G > bgClr.B;
+                Color fillClr = currentTheme == "Oscuro"
+                    ? (isGreenBadge ? Color.FromArgb(2, 25, 6) : Color.FromArgb(15, 23, 42))
+                    : bgClr;
+                Color borderClr = currentTheme == "Oscuro"
+                    ? (isGreenBadge ? Color.FromArgb(57, 255, 20) : Color.FromArgb(30, 41, 59))
+                    : bgClr;
+                using var fillBrush = new SolidBrush(fillClr);
+                using var pen = new Pen(borderClr, isGreenBadge && currentTheme == "Oscuro" ? 1.8f : 1.2f);
+                e.Graphics.FillPath(fillBrush, path);
+                if (currentTheme == "Oscuro") e.Graphics.DrawPath(pen, path);
+            };
+
+            return pnl;
+        }
+
+        private Panel CreatePipelineNodeCard(string emoji, string title, string subtitle,
+            Func<bool> isActive, out Label statusLbl, out Label iconLbl)
+        {
+            var pnl = CreateRoundedGlassCard(280, 110, 18);
+
+            var iconBox = new Label
+            {
+                Text = emoji,
+                Font = new Font("Segoe UI Emoji", 20F),
+                Size = new Size(48, 48),
+                Location = new Point(116, 10),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent
+            };
+            using var pathIcon = GetRoundedRectPath(new Rectangle(0, 0, 48, 48), 14);
+            iconBox.Region = new Region(pathIcon);
+
+            iconBox.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, iconBox.Width - 1, iconBox.Height - 1), 14);
+                // Parpadeo naranja cuando el nodo recibió actividad en los últimos 3 segundos
+                bool active = isActive() && blinkState;
+                Color bgColor = currentTheme == "Oscuro"
+                    ? (active ? Color.FromArgb(100, 48, 8) : Color.FromArgb(30, 41, 59))
+                    : (active ? Color.FromArgb(255, 200, 100) : Color.FromArgb(238, 242, 255));
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+                if (active)
+                {
+                    using var glowPen = new Pen(
+                        currentTheme == "Oscuro" ? Color.FromArgb(234, 88, 12) : Color.FromArgb(200, 120, 0), 2f);
+                    e.Graphics.DrawPath(glowPen, path);
+                }
             };
 
             var lblTitle = new Label
             {
                 Text = title,
-                Font = new Font("Segoe UI", 8.5F),
-                AutoSize = true,
-                Location = new Point(32, 6)
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42),
+                Size = new Size(260, 22),
+                Location = new Point(10, 62),
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
-            valLabel = new Label
+            statusLbl = new Label
+            {
+                Text = subtitle,
+                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139),
+                Size = new Size(260, 18),
+                Location = new Point(10, 84),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            pnl.Controls.Add(iconBox);
+            pnl.Controls.Add(lblTitle);
+            pnl.Controls.Add(statusLbl);
+
+            iconLbl = iconBox;
+            return pnl;
+        }
+
+        private Panel CreateMetricCard(string title, string initialVal, out Label valLbl)
+        {
+            var pnl = CreateRoundedGlassCard(250, 90, 16);
+
+            var lblTag = new Label
+            {
+                Text = title,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139),
+                Size = new Size(230, 18),
+                Location = new Point(10, 14),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            valLbl = new Label
             {
                 Text = initialVal,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(32, 24)
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42),
+                Size = new Size(230, 36),
+                Location = new Point(10, 36),
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
-            pnl.Controls.Add(lblIcon);
-            pnl.Controls.Add(lblTitle);
-            pnl.Controls.Add(valLabel);
+            pnl.Controls.Add(lblTag);
+            pnl.Controls.Add(valLbl);
 
             return pnl;
         }
 
-        private void RepositionCustomControls()
+        private Panel CreateSubPillBadge(string text)
         {
-            if (btnCopyPath != null && cardRutaTarget != null)
+            var pnl = new Panel
             {
-                btnCopyPath.Location = new Point(cardRutaTarget.ClientSize.Width - 42, 6);
+                Size = new Size(150, 32),
+                Margin = new Padding(0, 0, 10, 0),
+                BackColor = Color.Transparent
+            };
+            using var pathRegion = GetRoundedRectPath(new Rectangle(0, 0, 150, 32), 14);
+            pnl.Region = new Region(pathRegion);
 
-                // Ajustar el ancho del label de ruta para que llegue hasta el botón
-                if (lblRutaTargetText != null)
-                {
-                    int availableWidth = cardRutaTarget.ClientSize.Width - 50 - btnCopyPath.Width;
-                    lblRutaTargetText.Size = new Size(Math.Max(availableWidth, 400), lblRutaTargetText.Height);
-                }
-            }
-            if (lblStatusClock != null && pnlStatusBar != null)
+            var lbl = new Label
             {
-                lblStatusClock.Location = new Point(pnlStatusBar.ClientSize.Width - 210, 5);
-            }
-            if (btnPauseLog != null && btnClearLogView != null && chkAutoscroll != null && pnlLeftLog != null)
+                Text = text,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(156, 163, 175) : Color.FromArgb(71, 85, 105),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            pnl.Controls.Add(lbl);
+
+            pnl.Paint += (s, e) =>
             {
-                btnClearLogView.Location = new Point(pnlLeftLog.ClientSize.Width - 130, 4);
-                btnPauseLog.Location = new Point(pnlLeftLog.ClientSize.Width - 218, 4);
-                chkAutoscroll.Location = new Point(pnlLeftLog.ClientSize.Width - 315, 6);
-            }
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), 14);
+                Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(22, 31, 51) : Color.FromArgb(245, 255, 255, 255);
+                Color borderClr = currentTheme == "Oscuro" ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+                using var fillBrush = new SolidBrush(fillClr);
+                using var pen = new Pen(borderClr, 1.2f);
+                e.Graphics.FillPath(fillBrush, path);
+                e.Graphics.DrawPath(pen, path);
+            };
+
+            return pnl;
         }
 
-        private Font GetConsolasFont(float size)
+        private GraphicsPath GetRoundedRectPath(Rectangle bounds, int radius)
         {
-            try
-            {
-                return new Font("Cascadia Code", size, FontStyle.Bold);
-            }
-            catch
-            {
-                return new Font("Consolas", size, FontStyle.Bold);
-            }
-        }
-
-        private void CycleFontSize()
-        {
-            if (currentFontSize == "Grande") ApplyFontSize("Pequeno");
-            else if (currentFontSize == "Pequeno") ApplyFontSize("Mediano");
-            else ApplyFontSize("Grande");
-        }
-
-        private void ApplyFontSize(string size)
-        {
-            currentFontSize = size;
-            GuardarConfiguracionUI();
-
-            float logFontSize = 12F;
-            float btnFontSize = 9.25F;
-            int formWidth = 1260;
-            int formHeight = 800;
-
-            switch (size)
-            {
-                case "Pequeno":
-                    logFontSize = 9.5F;
-                    btnFontSize = 8.5F;
-                    formWidth = 1050;
-                    formHeight = 680;
-                    btnSizeToggle.Text = "🗄️ Fuente: PEQUEÑO ▾";
-                    break;
-                case "Mediano":
-                    logFontSize = 11F;
-                    btnFontSize = 9F;
-                    formWidth = 1160;
-                    formHeight = 740;
-                    btnSizeToggle.Text = "🗄️ Fuente: MEDIANO ▾";
-                    break;
-                default: // Grande
-                    logFontSize = 12F;
-                    btnFontSize = 9.25F;
-                    formWidth = 1260;
-                    formHeight = 800;
-                    btnSizeToggle.Text = "🗄️ Fuente: GRANDE ▾";
-                    break;
-            }
-
-            this.Size = new Size(formWidth, formHeight);
-            txtLog.Font = GetConsolasFont(logFontSize);
-
-            Font btnFont = new Font("Segoe UI", btnFontSize, FontStyle.Bold);
-            btnAck.Font = btnFont;
-            btnAutoToggle.Font = btnFont;
-            btnViewErrors.Font = btnFont;
-            btnExport.Font = btnFont;
-            btnPrint.Font = btnFont;
-            btnClear.Font = btnFont;
-            btnMas.Font = btnFont;
-            btnSizeToggle.Font = btnFont;
-            btnThemeToggle.Font = btnFont;
-            btnSync.Font = btnFont;
-        }
-
-        private void ToggleTheme()
-        {
-            if (currentTheme == "Oscuro") ApplyTheme("Claro");
-            else ApplyTheme("Oscuro");
-        }
-
-        private void ApplyTheme(string theme)
-        {
-            currentTheme = theme;
-            GuardarConfiguracionUI();
-
-            if (theme == "Claro")
-            {
-                Color bgMain = Color.FromArgb(241, 245, 249);
-                Color cardBg = Color.White;
-                Color textPrimary = Color.FromArgb(15, 23, 42);
-                Color textMuted = Color.FromArgb(100, 116, 139);
-                Color borderClr = Color.FromArgb(226, 232, 240);
-
-                this.BackColor = bgMain;
-                pnlHeader.BackColor = bgMain;
-                pnlStatusBar.BackColor = Color.FromArgb(226, 232, 240);
-                pnlStatusBar.ForeColor = textPrimary;
-
-                lblHeaderTitle.ForeColor = textPrimary;
-                lblHeaderSubtitle.ForeColor = textMuted;
-                lblHeaderStatusText.ForeColor = textPrimary;
-                btnHeaderSettings.BackColor = borderClr;
-                btnHeaderSettings.ForeColor = textPrimary;
-
-                cardPendientes.BackColor = cardBg;
-                cardIncidencias.BackColor = cardBg;
-                cardRutaTarget.BackColor = cardBg;
-                pnlLeftLog.BackColor = cardBg;
-                pnlRightSidebar.BackColor = cardBg;
-
-                lblPendientesMain.ForeColor = textPrimary;
-                lblPendientesSub.ForeColor = textMuted;
-                lblIncidenciasMain.ForeColor = textPrimary;
-                lblIncidenciasSub.ForeColor = textMuted;
-                lblRutaTargetText.ForeColor = Color.FromArgb(2, 132, 199);
-                btnCopyPath.BackColor = borderClr;
-                btnCopyPath.ForeColor = textPrimary;
-
-                txtLog.BackColor = Color.White;
-                txtLog.ForeColor = textPrimary;
-
-                var lightRenderer = new LightMenuRenderer();
-                trayMenu.Renderer = lightRenderer;
-                menuMasAcciones.Renderer = lightRenderer;
-
-                btnThemeToggle.Text = "🌞 Tema: CLARO";
-                btnThemeToggle.BackColor = Color.FromArgb(203, 213, 225);
-                btnThemeToggle.ForeColor = textPrimary;
-            }
-            else // Oscuro (Dark Slate Glassmorphism)
-            {
-                Color bgMain = Color.FromArgb(15, 23, 42);       // Slate 900
-                Color cardBg = Color.FromArgb(30, 41, 59);      // Slate 800
-                Color textPrimary = Color.FromArgb(248, 250, 252);
-                Color textMuted = Color.FromArgb(148, 163, 184);
-                Color borderClr = Color.FromArgb(51, 65, 85);
-
-                this.BackColor = bgMain;
-                pnlHeader.BackColor = bgMain;
-                pnlStatusBar.BackColor = Color.FromArgb(10, 15, 30);
-                pnlStatusBar.ForeColor = textMuted;
-
-                lblHeaderTitle.ForeColor = textPrimary;
-                lblHeaderSubtitle.ForeColor = textMuted;
-                lblHeaderStatusText.ForeColor = textPrimary;
-                btnHeaderSettings.BackColor = borderClr;
-                btnHeaderSettings.ForeColor = textPrimary;
-
-                cardPendientes.BackColor = cardBg;
-                cardIncidencias.BackColor = cardBg;
-                cardRutaTarget.BackColor = cardBg;
-                pnlLeftLog.BackColor = cardBg;
-                pnlRightSidebar.BackColor = cardBg;
-
-                lblPendientesMain.ForeColor = textPrimary;
-                lblPendientesSub.ForeColor = textMuted;
-                lblIncidenciasMain.ForeColor = textPrimary;
-                lblIncidenciasSub.ForeColor = textMuted;
-                lblRutaTargetText.ForeColor = Color.FromArgb(56, 189, 248);
-                btnCopyPath.BackColor = borderClr;
-                btnCopyPath.ForeColor = textPrimary;
-
-                txtLog.BackColor = Color.FromArgb(2, 6, 23);     // Terminal Slate 950
-                txtLog.ForeColor = Color.FromArgb(52, 211, 153); // Emerald Code
-
-                var darkRenderer = new DarkMenuRenderer();
-                trayMenu.Renderer = darkRenderer;
-                menuMasAcciones.Renderer = darkRenderer;
-
-                btnThemeToggle.Text = "🌙 Tema: OSCURO";
-                btnThemeToggle.BackColor = Color.FromArgb(51, 65, 85);
-                btnThemeToggle.ForeColor = textPrimary;
-            }
-
-            UpdateStatusLabels();
-            RepositionCustomControls();
+            int diameter = Math.Max(radius * 2, 1);
+            var path = new GraphicsPath();
+            path.AddArc(bounds.X, bounds.Y, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Y, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.X, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         private void CargarConfiguracionUI()
@@ -1011,10 +768,6 @@ namespace ReprediTrayDaemon
                 {
                     string json = File.ReadAllText(settingsFilePath);
                     using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("TamanoFuente", out var elemFuente))
-                    {
-                        currentFontSize = elemFuente.GetString() ?? "Grande";
-                    }
                     if (doc.RootElement.TryGetProperty("AutoAceptar", out var elemAuto))
                     {
                         autoAcceptMode = elemAuto.GetBoolean();
@@ -1044,6 +797,45 @@ namespace ReprediTrayDaemon
             catch { }
         }
 
+        private void ProcesarLlegadaPedido(string? numPedido = null, string cliente = "1001 (CLIENTE DE PRUEBA SL)", decimal importe = 450.00m)
+        {
+            if (string.IsNullOrWhiteSpace(numPedido))
+            {
+                numPedido = $"P-{simOrderCounter++:D4}";
+            }
+
+            if (autoAcceptMode)
+            {
+                totalRegistrosProcesadosHoy++;
+                syncService.AppendLog($"[SYNC] INSERT INTO PedidosCab (NumPedido, Cliente, Total) VALUES ('{numPedido}', '{cliente}', {importe:F2}) -> Confirmado automáticamente.", DbSyncService.LogLevel.Success);
+                try { trayIcon.ShowBalloonTip(3000, "⚡ Pedido Auto-Aceptado", $"Pedido {numPedido} confirmado automáticamente.", ToolTipIcon.Info); } catch { }
+            }
+            else
+            {
+                pedidosPendientesCount++;
+                syncService.AppendLog($"[PEDIDO] Llegada de pedido N. {numPedido} | Cliente: {cliente} | Importe: {importe:F2} EUR (Esperando confirmación manual).", DbSyncService.LogLevel.Warning);
+                try { trayIcon.ShowBalloonTip(4000, "⚠️ Nuevo Pedido Pendiente", $"Pedido N. {numPedido} ({cliente}) requiere confirmación manual.", ToolTipIcon.Warning); } catch { }
+            }
+            UpdateStatusLabels();
+        }
+
+        private void ConfirmarPedidosPendientesManual()
+        {
+            if (pedidosPendientesCount > 0)
+            {
+                int confirmados = pedidosPendientesCount;
+                totalRegistrosProcesadosHoy += confirmados;
+                pedidosPendientesCount = 0;
+                syncService.AppendLog($"[OK] {confirmados} pedido(s) confirmado(s) exitosamente por el usuario.", DbSyncService.LogLevel.Success);
+                MessageBox.Show($"¡Se han confirmado y procesado {confirmados} pedido(s) pendiente(s)!", "PsSyncBridge Tray - Confirmación", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("No hay pedidos pendientes de confirmación.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            UpdateStatusLabels();
+        }
+
         private void ToggleAutoAcceptMode()
         {
             autoAcceptMode = !autoAcceptMode;
@@ -1051,62 +843,246 @@ namespace ReprediTrayDaemon
 
             if (autoAcceptMode)
             {
-                btnAutoToggle.Text = "⚙️ AUTO-ACEPTAR\nACTIVO";
-                btnAutoToggle.BackColor = Color.FromArgb(16, 185, 129);
                 syncService.AppendLog("[CONFIG] Auto-aceptación de pedidos ACTIVADA.", DbSyncService.LogLevel.Info);
+
+                if (pedidosPendientesCount > 0)
+                {
+                    int confirmados = pedidosPendientesCount;
+                    totalRegistrosProcesadosHoy += confirmados;
+                    pedidosPendientesCount = 0;
+                    syncService.AppendLog($"[AUTO-ACEPTAR] Se han procesado los {confirmados} pedido(s) pendiente(s) automáticamente.", DbSyncService.LogLevel.Success);
+                }
             }
             else
             {
-                btnAutoToggle.Text = "⚙️ Auto-aceptar\nDesactivado";
-                btnAutoToggle.BackColor = Color.FromArgb(99, 102, 241);
                 syncService.AppendLog("[CONFIG] Auto-aceptación de pedidos DESACTIVADA (Modo Confirmación Manual).", DbSyncService.LogLevel.Info);
+            }
+            UpdateStatusLabels();
+        }
+
+        private void ToggleTheme()
+        {
+            string nextTheme = currentTheme == "Claro" ? "Oscuro" : "Claro";
+            ApplyTheme(nextTheme);
+            syncService.AppendLog($"[CONFIG] Tema de interfaz cambiado a «{nextTheme}».", DbSyncService.LogLevel.Info);
+        }
+
+        private void UpdateNodeCardTheme(Panel card, bool isDark)
+        {
+            if (card == null) return;
+            foreach (Control c in card.Controls)
+            {
+                if (c is Label lbl)
+                {
+                    if (lbl.Font.Bold)
+                    {
+                        lbl.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42);
+                    }
+                    else if (lbl.Size.Width == 48)
+                    {
+                        lbl.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42);
+                        lbl.Invalidate();
+                    }
+                    else
+                    {
+                        lbl.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
+                    }
+                }
+            }
+            card.Invalidate();
+        }
+
+        private void InvalidateChildren(Control parent)
+        {
+            if (parent == null) return;
+            parent.Invalidate();
+            foreach (Control child in parent.Controls)
+            {
+                InvalidateChildren(child);
             }
         }
 
         private void UpdateStatusLabels()
         {
-            lblPendientesMain.Text = "Sin pedidos pendientes";
-            lblPendientesSub.Text = "Todos los pedidos procesados.";
-
-            if (lblTeleProcessedVal != null)
-                lblTeleProcessedVal.Text = totalRegistrosProcesadosHoy.ToString("N0");
-
+            bool isDark = currentTheme == "Oscuro";
             if (autoAcceptMode)
             {
-                btnAutoToggle.Text = "⚙️ AUTO-ACEPTAR\nACTIVO";
-                btnAutoToggle.BackColor = Color.FromArgb(16, 185, 129);
+                btnPillAuto.BackColor = isDark ? Color.FromArgb(234, 88, 12) : Color.FromArgb(99, 102, 241);
+                btnPillAuto.ForeColor = Color.White;
+                btnPillManual.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+                btnPillManual.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(100, 116, 139);
             }
             else
             {
-                btnAutoToggle.Text = "⚙️ Auto-aceptar\nDesactivado";
-                btnAutoToggle.BackColor = Color.FromArgb(99, 102, 241);
+                btnPillAuto.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+                btnPillAuto.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(100, 116, 139);
+                btnPillManual.BackColor = Color.FromArgb(245, 158, 11);
+                btnPillManual.ForeColor = Color.White;
             }
 
-            if (syncService.ErrorCount > 0)
+            if (lblProcessedVal != null) lblProcessedVal.Text = totalRegistrosProcesadosHoy.ToString();
+
+            if (lblPendingVal != null)
             {
-                lblIncidenciasMain.Text = $"Incidencias: {syncService.ErrorCount} errores/alertas acumuladas";
-                lblIncidenciasMain.ForeColor = Color.FromArgb(244, 63, 94);
-                lblIncidenciasSub.Text = "Se han registrado fallos en las últimas sincronizaciones.";
-                btnViewErrors.Text = $"⚠️ Ver errores ({syncService.ErrorCount})";
-                btnViewErrors.BackColor = Color.FromArgb(225, 29, 72);
+                lblPendingVal.Text = pedidosPendientesCount.ToString();
+                lblPendingVal.ForeColor = pedidosPendientesCount > 0
+                    ? Color.FromArgb(245, 158, 11)
+                    : (isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42));
             }
-            else
+        }
+
+        private void ApplyTheme(string theme)
+        {
+            currentTheme = theme;
+            GuardarConfiguracionUI();
+
+            bool isDark = currentTheme == "Oscuro";
+
+            if (pnlMainContent != null)
+                pnlMainContent.BackColor = isDark ? Color.FromArgb(10, 15, 26) : Color.FromArgb(238, 242, 255);
+
+            // Header Text Colors
+            if (lblHeaderTitle != null)
+                lblHeaderTitle.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(30, 41, 59);
+
+            if (lblHeaderSubtitle != null)
+                lblHeaderSubtitle.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
+
+            // Mode Switch
+            if (lblModeTag != null)
+                lblModeTag.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
+
+            UpdateStatusLabels();
+
+            // Pipeline Cards
+            if (cardNodePg != null) UpdateNodeCardTheme(cardNodePg, isDark);
+            if (cardNodeBridge != null) UpdateNodeCardTheme(cardNodeBridge, isDark);
+            if (cardNodeAccess != null) UpdateNodeCardTheme(cardNodeAccess, isDark);
+            iconNodePg?.Invalidate();
+            iconNodeBridge?.Invalidate();
+            iconNodeAccess?.Invalidate();
+
+            // Online badge - verde neón fosforito en modo oscuro
+            if (pnlOnlineBadge != null)
             {
-                lblIncidenciasMain.Text = "Incidencias: 0 errores | 0 advertencias (Sin errores)";
-                lblIncidenciasMain.ForeColor = currentTheme == "Claro" ? Color.FromArgb(15, 23, 42) : Color.FromArgb(52, 211, 153);
-                lblIncidenciasSub.Text = "El sistema está operando correctamente.";
-                btnViewErrors.Text = "⚠️ Ver errores (0)";
-                btnViewErrors.BackColor = Color.FromArgb(71, 85, 105);
+                foreach (Control c in pnlOnlineBadge.Controls)
+                    if (c is Label lbl) lbl.ForeColor = isDark ? Color.FromArgb(57, 255, 20) : Color.FromArgb(21, 128, 61);
+                pnlOnlineBadge.Invalidate();
             }
 
-            lblRutaTargetText.Text = "Destino ERP PsGest: " + syncService.MdbPath;
-
-            // Ajustar el ancho del label para que llegue hasta el final
-            if (cardRutaTarget != null && btnCopyPath != null)
+            // btnVerPedidos theming
+            if (btnVerPedidos != null)
             {
-                int availableWidth = cardRutaTarget.ClientSize.Width - 50 - btnCopyPath.Width;
-                lblRutaTargetText.Size = new Size(Math.Max(availableWidth, 400), lblRutaTargetText.Height);
+                btnVerPedidos.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249);
+                btnVerPedidos.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
+                btnVerPedidos.FlatAppearance.BorderColor = isDark ? Color.FromArgb(51, 65, 85) : Color.FromArgb(203, 213, 225);
             }
+
+            // Metric Cards
+            if (pnlMetricCards != null)
+            {
+                foreach (Control col in pnlMetricCards.Controls)
+                {
+                    if (col is Panel card)
+                    {
+                        foreach (Control sub in card.Controls)
+                        {
+                            if (sub is Label lbl)
+                            {
+                                if (lbl == lblPendingVal && pedidosPendientesCount > 0)
+                                {
+                                    lbl.ForeColor = Color.FromArgb(245, 158, 11);
+                                }
+                                else if (lbl.Font.Bold && lbl.Font.Size > 12)
+                                {
+                                    lbl.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42);
+                                }
+                                else
+                                {
+                                    lbl.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
+                                }
+                            }
+                        }
+                        card.Invalidate();
+                    }
+                }
+            }
+
+            // Sub-Metric Badges
+            if (flowSubMetrics != null)
+            {
+                foreach (Control col in flowSubMetrics.Controls)
+                {
+                    if (col is Panel pill)
+                    {
+                        foreach (Control sub in pill.Controls)
+                        {
+                            if (sub is Label lbl)
+                            {
+                                lbl.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(71, 85, 105);
+                            }
+                        }
+                        pill.Invalidate();
+                    }
+                }
+            }
+
+            // Log Console Header & Control Buttons
+            if (lblConsoleTitle != null)
+                lblConsoleTitle.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(71, 85, 105);
+
+            if (chkAutoscroll != null)
+            {
+                chkAutoscroll.BackColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(234, 88, 12) : Color.FromArgb(30, 41, 59)) : (isAutoscrollEnabled ? Color.FromArgb(219, 234, 254) : Color.FromArgb(241, 245, 249));
+                chkAutoscroll.ForeColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(15, 15, 15) : Color.FromArgb(148, 163, 184)) : (isAutoscrollEnabled ? Color.FromArgb(29, 78, 216) : Color.FromArgb(100, 116, 139));
+            }
+
+            if (btnClearLogView != null)
+            {
+                btnClearLogView.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249);
+                btnClearLogView.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
+            }
+
+            if (lblLogSubBar != null)
+                lblLogSubBar.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(100, 116, 139);
+
+            if (txtLog != null)
+            {
+                txtLog.BackColor = isDark ? Color.FromArgb(10, 14, 23) : Color.FromArgb(248, 250, 252);
+                txtLog.ForeColor = isDark ? Color.FromArgb(226, 232, 240) : Color.FromArgb(15, 23, 42);
+            }
+
+            // Footer Status Bar
+            if (lblFooterServiceInfo != null)
+                lblFooterServiceInfo.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
+
+            if (lblFooterStatusBadge != null)
+                lblFooterStatusBadge.ForeColor = isDark ? Color.FromArgb(74, 222, 128) : Color.FromArgb(21, 128, 61);
+
+            InvalidateChildren(this);
+            this.Invalidate();
+        }
+
+        private void TimerHealth_Tick(object? sender, EventArgs e)
+        {
+            syncService.CheckLogFilesForNewLines();
+
+            if (lblClockVal != null)
+            {
+                lblClockVal.Text = DateTime.Now.ToString("HH:mm:ss");
+            }
+
+            if (lblUptimeVal != null)
+            {
+                TimeSpan uptime = DateTime.Now - startTime;
+                lblUptimeVal.Text = $"{uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
+            }
+
+            // Parpadeo de iconos de nodos activos cada tick (~1s)
+            blinkState = !blinkState;
+            iconNodePg?.Invalidate();
+            iconNodeBridge?.Invalidate();
+            iconNodeAccess?.Invalidate();
         }
 
         private void SyncService_OnLogMessage(string message, DbSyncService.LogLevel level)
@@ -1117,49 +1093,89 @@ namespace ReprediTrayDaemon
                 return;
             }
 
-            if (lblTeleLastSyncVal != null)
-                lblTeleLastSyncVal.Text = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
-
             if (isLogPaused) return;
 
-            Color logColor;
-            if (currentTheme == "Claro")
+            string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+
+            // Insignias formateadas según nivel de log y tema actual
+            string tag = level switch
             {
-                logColor = level switch
-                {
-                    DbSyncService.LogLevel.Error => Color.FromArgb(220, 38, 38),   // Dark Red
-                    DbSyncService.LogLevel.Warning => Color.FromArgb(217, 119, 6), // Amber Dark
-                    DbSyncService.LogLevel.Success => Color.FromArgb(5, 150, 105), // Emerald Dark
-                    _ => Color.FromArgb(2, 132, 199)                               // Blue Info
-                };
+                DbSyncService.LogLevel.Error => "ERROR",
+                DbSyncService.LogLevel.Warning => "WARN",
+                DbSyncService.LogLevel.Success => "SYNC",
+                _ => "SQL"
+            };
+
+            // Activar indicadores visuales de nodos según actividad de log
+            if (level == DbSyncService.LogLevel.Success)
+            {
+                pgLastActive = DateTime.Now;
+                bridgeLastActive = DateTime.Now;
+                accessLastActive = DateTime.Now;
             }
+            else if (level == DbSyncService.LogLevel.Warning)
+                bridgeLastActive = DateTime.Now;
             else
+                pgLastActive = DateTime.Now;
+
+            Color tagColor = (currentTheme == "Oscuro") switch
             {
-                logColor = level switch
+                true => level switch
                 {
-                    DbSyncService.LogLevel.Error => Color.FromArgb(244, 63, 94),   // Rose Red
-                    DbSyncService.LogLevel.Warning => Color.FromArgb(245, 158, 11), // Amber Warning
-                    DbSyncService.LogLevel.Success => Color.FromArgb(52, 211, 153), // Emerald Green
-                    _ => Color.FromArgb(56, 189, 248)                                // Sky Blue Info
-                };
-            }
+                    DbSyncService.LogLevel.Error => Color.FromArgb(248, 113, 113),   // Coral Red (#F87171)
+                    DbSyncService.LogLevel.Warning => Color.FromArgb(251, 191, 36),  // Amber Gold (#FBBF24)
+                    DbSyncService.LogLevel.Success => Color.FromArgb(192, 132, 252),// Light Purple (#C084FC)
+                    _ => Color.FromArgb(251, 146, 60)                               // Warm Orange (#FB923C)
+                },
+                false => level switch
+                {
+                    DbSyncService.LogLevel.Error => Color.FromArgb(220, 38, 38),   // Red
+                    DbSyncService.LogLevel.Warning => Color.FromArgb(180, 83, 9),  // Amber
+                    DbSyncService.LogLevel.Success => Color.FromArgb(107, 33, 168),// Purple
+                    _ => Color.FromArgb(30, 64, 175)                               // Blue
+                }
+            };
+
+            Color bodyTextColor = currentTheme == "Oscuro" ? Color.FromArgb(226, 232, 240) : Color.FromArgb(15, 23, 42);
 
             txtLog.SelectionStart = txtLog.TextLength;
             txtLog.SelectionLength = 0;
-            txtLog.SelectionColor = logColor;
-            txtLog.AppendText(message + Environment.NewLine);
-            txtLog.SelectionColor = txtLog.ForeColor;
+
+            // Timestamp
+            txtLog.SelectionColor = currentTheme == "Oscuro" ? Color.FromArgb(100, 116, 139) : Color.FromArgb(148, 163, 184);
+            txtLog.AppendText($"{timestamp}  ");
+
+            // Tag badge
+            txtLog.SelectionColor = tagColor;
+            txtLog.AppendText($"{tag,-5} ");
+
+            // Text
+            txtLog.SelectionColor = bodyTextColor;
+            txtLog.AppendText($"{message}{Environment.NewLine}");
 
             if (isAutoscrollEnabled)
             {
                 txtLog.ScrollToCaret();
             }
 
-            UpdateStatusLabels();
+            // Interceptar pedidos de logs externos
+            if (message.Contains("[NUEVO PEDIDO]", StringComparison.OrdinalIgnoreCase) &&
+                !message.Contains("[AUTO-ACEPTADO]", StringComparison.OrdinalIgnoreCase) &&
+                !message.Contains("[PEDIDO PENDIENTE]", StringComparison.OrdinalIgnoreCase))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(message, @"\[NUEVO PEDIDO\]\s+Recibido pedido N\.\s+([^\s|]+)(?:\s+\|?\s*Cliente:\s*([^|]+))?");
+                string numPed = match.Success && match.Groups[1].Value.Length > 0 ? match.Groups[1].Value : $"P-{DateTime.Now:HHmmss}";
+                string cliente = match.Success && match.Groups[2].Success ? match.Groups[2].Value.Trim() : "Cliente ERP";
+                ProcesarLlegadaPedido(numPed, cliente, 100.00m);
+            }
+            else
+            {
+                UpdateStatusLabels();
+            }
 
             if (level == DbSyncService.LogLevel.Error)
             {
-                trayIcon.ShowBalloonTip(3000, "ReprediSL V4 - Error", message, ToolTipIcon.Error);
+                try { trayIcon.ShowBalloonTip(3000, "PsSyncBridge - Error", message, ToolTipIcon.Error); } catch { }
             }
         }
 
@@ -1171,58 +1187,58 @@ namespace ReprediTrayDaemon
                 return;
             }
 
-            UpdateStatusLabels();
-
-            var dialogResult = MessageBox.Show(
-                $"🚨 Se han detectado {count} incidencias consecutivas en la sincronización.\n\n" +
-                "¿Deseas DETENER la sincronización actual?\n\n" +
-                "[Sí] Detener Proceso\n" +
-                "[No] Silenciar alertas visuales y continuar\n" +
-                "[Cancelar] Ignorar por ahora",
-                "Alerta de Incidencias Elevadas - ReprediSL V4",
-                MessageBoxButtons.YesNoCancel,
-                MessageBoxIcon.Warning
-            );
-
-            if (dialogResult == DialogResult.Yes)
+            try
             {
-                syncService.StopCurrentSync();
+                trayIcon.ShowBalloonTip(5000, "⚠️ Alerta de Incidencias en Ráfaga", $"Se han acumulado {count} errores consecutivos en la sincronización con PostgreSQL.", ToolTipIcon.Warning);
             }
-            else if (dialogResult == DialogResult.No)
-            {
-                syncService.SilenceAlerts = true;
-            }
-        }
-
-        private void TimerHealth_Tick(object? sender, EventArgs e)
-        {
-            syncService.CheckLogFilesForNewLines();
-
-            // Actualizar reloj y tiempo de actividad (Uptime)
-            if (lblStatusClock != null)
-            {
-                lblStatusClock.Text = DateTime.Now.ToString("ddd d MMM yyyy | HH:mm:ss");
-            }
-
-            if (lblTeleUptimeVal != null)
-            {
-                TimeSpan uptime = DateTime.Now - startTime;
-                lblTeleUptimeVal.Text = $"{uptime.Hours} h {uptime.Minutes:D2} min {uptime.Seconds:D2} s";
-            }
+            catch { }
         }
 
         private async Task DoManualSyncAsync()
         {
-            btnSync.Enabled = false;
-            btnSync.Text = "⏳ Sincronizando...";
             try
             {
                 await syncService.RunExportAsync();
             }
-            finally
+            catch { }
+        }
+
+        private void ShowForm()
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.BringToFront();
+            this.Activate();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!forceClose && e.CloseReason == CloseReason.UserClosing)
             {
-                btnSync.Enabled = true;
-                btnSync.Text = "🔄 Sincronizar PostgreSQL";
+                e.Cancel = true;
+                this.Hide();
+                try
+                {
+                    trayIcon.ShowBalloonTip(2000, "PsSyncBridge Tray", "El demonio continúa ejecutándose en segundo plano en la bandeja de sistema.", ToolTipIcon.Info);
+                }
+                catch { }
+            }
+            else
+            {
+                base.OnFormClosing(e);
+            }
+        }
+
+        private void SimularErrorSync()
+        {
+            syncService.AppendLog("[ERROR] Fallo de prueba simulado: Conexión intermitente con PostgreSQL.", DbSyncService.LogLevel.Error);
+        }
+
+        private void SimularRafagaErrores()
+        {
+            for (int i = 1; i <= 4; i++)
+            {
+                syncService.AppendLog($"[ERROR] Ráfaga de incidencia #{i}: Simulación de fallo en lote {i * 500}", DbSyncService.LogLevel.Error);
             }
         }
 
@@ -1230,15 +1246,15 @@ namespace ReprediTrayDaemon
         {
             if (string.IsNullOrWhiteSpace(txtLog.Text))
             {
-                MessageBox.Show("El registro está vacío. No hay datos para exportar.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("El registro está vacío. No hay datos para exportar.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             using var sfd = new SaveFileDialog
             {
-                Title = "Exportar Registro de Sincronización y Pedidos",
+                Title = "Exportar Registro de Sincronización",
                 Filter = "Archivos de texto (*.txt)|*.txt|Archivos de Log (*.log)|*.log|Todos los archivos (*.*)|*.*",
-                FileName = $"Registro_ReprediSL_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
+                FileName = $"Registro_Sync_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
             };
 
             if (sfd.ShowDialog() == DialogResult.OK)
@@ -1259,7 +1275,7 @@ namespace ReprediTrayDaemon
         {
             if (string.IsNullOrWhiteSpace(txtLog.Text))
             {
-                MessageBox.Show("El registro está vacío. No hay datos para imprimir.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("El registro está vacío. No hay datos para imprimir.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -1291,13 +1307,13 @@ namespace ReprediTrayDaemon
         {
             if (string.IsNullOrWhiteSpace(txtLog.Text))
             {
-                MessageBox.Show("El registro ya está vacío.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("El registro ya está vacío.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var resp = MessageBox.Show(
                 "¿Deseas guardar una copia de seguridad del registro antes de limpiarlo?",
-                "Limpiar Registro - ReprediSL V4",
+                "Limpiar Registro - PsSyncBridge Tray",
                 MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question
             );
@@ -1311,7 +1327,7 @@ namespace ReprediTrayDaemon
 
             txtLog.Clear();
             try { File.WriteAllText(syncService.ProgressLogPath, string.Empty); } catch { }
-            MessageBox.Show("El registro ha sido limpiado correctamente.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("El registro ha sido limpiado correctamente.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void MostrarVentanaErrores()
@@ -1322,7 +1338,7 @@ namespace ReprediTrayDaemon
 
             using var errForm = new Form
             {
-                Text = "ReprediSL V4 - Log Especial de Errores e Incidencias (sync_errors.log)",
+                Text = "PsSyncBridge Tray - Log Especial de Errores e Incidencias (sync_errors.log)",
                 StartPosition = FormStartPosition.CenterParent,
                 BackColor = dialogBg,
                 Size = new Size(1050, 650)
@@ -1409,129 +1425,120 @@ namespace ReprediTrayDaemon
             errForm.ShowDialog(this);
         }
 
-        private void ShowForm()
+        private void MostrarVentanaPedidos()
         {
-            this.Show();
-            this.WindowState = FormWindowState.Normal;
-            this.BringToFront();
-            this.Activate();
-        }
+            bool isDark = currentTheme == "Oscuro";
+            Color dialogBg = isDark ? Color.FromArgb(10, 15, 26) : Color.FromArgb(238, 242, 255);
+            Color topBg    = isDark ? Color.FromArgb(15, 23, 42)  : Color.FromArgb(226, 232, 240);
+            Color cardBg   = isDark ? Color.FromArgb(22, 31, 51)  : Color.White;
+            Color textFg   = isDark ? Color.FromArgb(226, 232, 240) : Color.FromArgb(15, 23, 42);
+            Color subtextFg = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
 
-        private void ExitApplication()
-        {
-            forceClose = true;
-            trayIcon.Visible = false;
-            Application.Exit();
-        }
-
-        protected override void OnFormClosing(FormClosingEventArgs e)
-        {
-            if (!forceClose && e.CloseReason == CloseReason.UserClosing)
+            using var pedForm = new Form
             {
-                e.Cancel = true;
-                this.Hide();
-                trayIcon.ShowBalloonTip(2000, "ReprediSL V4", "El demonio sigue ejecutándose en segundo plano en la barra de tareas.", ToolTipIcon.Info);
+                Text = "PsSyncBridge — Ver Pedidos",
+                StartPosition = FormStartPosition.CenterParent,
+                BackColor = dialogBg,
+                Size = new Size(920, 580),
+                MinimumSize = new Size(700, 400),
+                FormBorderStyle = FormBorderStyle.Sizable
+            };
+
+            // Cabecera
+            var pnlTop = new Panel { Dock = DockStyle.Top, Height = 72, BackColor = topBg };
+
+            var lblTitlePed = new Label
+            {
+                Text = $"📋  Pedidos  ·  {recentOrders.Count} registros  ·  {totalRegistrosProcesadosHoy} procesados hoy",
+                Location = new Point(16, 10),
+                AutoSize = true,
+                ForeColor = textFg,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold)
+            };
+
+            var lblPendingInfo = new Label
+            {
+                Text = pedidosPendientesCount > 0
+                    ? $"⏳  {pedidosPendientesCount} pedido(s) pendiente(s) de confirmación manual"
+                    : "✅  Sin pedidos pendientes",
+                Location = new Point(16, 40),
+                AutoSize = true,
+                ForeColor = pedidosPendientesCount > 0 ? Color.FromArgb(245, 158, 11) : Color.FromArgb(57, 255, 20),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+            };
+
+            var btnConfirmarTodos = new Button
+            {
+                Text = "✅  Confirmar todos los pendientes",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(234, 88, 12),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Size = new Size(250, 34),
+                Location = new Point(940 - 266, 18),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Visible = pedidosPendientesCount > 0
+            };
+            btnConfirmarTodos.FlatAppearance.BorderSize = 0;
+            btnConfirmarTodos.Click += (s, e) =>
+            {
+                ConfirmarPedidosPendientesManual();
+                pedForm.Close();
+            };
+
+            pnlTop.Controls.Add(lblTitlePed);
+            pnlTop.Controls.Add(lblPendingInfo);
+            pnlTop.Controls.Add(btnConfirmarTodos);
+
+            // ListView de pedidos
+            var listView = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = false,
+                BorderStyle = BorderStyle.None,
+                BackColor = cardBg,
+                ForeColor = textFg,
+                Font = new Font("Segoe UI", 9.5F),
+                HeaderStyle = ColumnHeaderStyle.Nonclickable
+            };
+
+            listView.Columns.Add("Nº Pedido",   110);
+            listView.Columns.Add("Cliente",     260);
+            listView.Columns.Add("Importe",     100);
+            listView.Columns.Add("Hora",         90);
+            listView.Columns.Add("Estado",      150);
+
+            if (recentOrders.Count == 0)
+            {
+                var emptyItem = new ListViewItem("—")
+                    { ForeColor = subtextFg };
+                emptyItem.SubItems.Add("Sin pedidos registrados en esta sesión");
+                emptyItem.SubItems.Add("—");
+                emptyItem.SubItems.Add("—");
+                emptyItem.SubItems.Add("—");
+                listView.Items.Add(emptyItem);
             }
             else
             {
-                base.OnFormClosing(e);
-            }
-        }
-    }
-
-    // Renderizadores de menú estilo WinForms profesional
-    public class LightMenuRenderer : ToolStripProfessionalRenderer
-    {
-        public LightMenuRenderer() : base(new LightColorTable()) { }
-
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            e.TextColor = e.Item.Enabled ? Color.FromArgb(15, 23, 42) : Color.FromArgb(148, 163, 184);
-            base.OnRenderItemText(e);
-        }
-    }
-
-    public class LightColorTable : ProfessionalColorTable
-    {
-        public override Color MenuItemSelected => Color.FromArgb(226, 232, 240);
-        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(226, 232, 240);
-        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(226, 232, 240);
-        public override Color MenuItemBorder => Color.FromArgb(203, 213, 225);
-        public override Color MenuBorder => Color.FromArgb(203, 213, 225);
-        public override Color ToolStripDropDownBackground => Color.FromArgb(255, 255, 255);
-        public override Color ImageMarginGradientBegin => Color.FromArgb(255, 255, 255);
-        public override Color ImageMarginGradientMiddle => Color.FromArgb(255, 255, 255);
-        public override Color ImageMarginGradientEnd => Color.FromArgb(255, 255, 255);
-        public override Color SeparatorDark => Color.FromArgb(203, 213, 225);
-        public override Color SeparatorLight => Color.Transparent;
-    }
-
-    public class DarkMenuRenderer : ToolStripProfessionalRenderer
-    {
-        public DarkMenuRenderer() : base(new DarkColorTable()) { }
-
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            e.TextColor = e.Item.Enabled ? Color.FromArgb(255, 255, 255) : Color.FromArgb(148, 163, 184);
-            base.OnRenderItemText(e);
-        }
-    }
-
-    public class DarkColorTable : ProfessionalColorTable
-    {
-        public override Color MenuItemSelected => Color.FromArgb(51, 65, 85);
-        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(51, 65, 85);
-        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(51, 65, 85);
-        public override Color MenuItemBorder => Color.FromArgb(71, 85, 105);
-        public override Color MenuBorder => Color.FromArgb(51, 65, 85);
-        public override Color ToolStripDropDownBackground => Color.FromArgb(30, 41, 59);
-        public override Color ImageMarginGradientBegin => Color.FromArgb(30, 41, 59);
-        public override Color ImageMarginGradientMiddle => Color.FromArgb(30, 41, 59);
-        public override Color ImageMarginGradientEnd => Color.FromArgb(30, 41, 59);
-        public override Color SeparatorDark => Color.FromArgb(71, 85, 105);
-        public override Color SeparatorLight => Color.Transparent;
-    }
-
-    // --- Módulo ThemeColor (Estilo y Paleta Multicolor RJ Code Advance) ---
-    public static class ThemeColor
-    {
-        public static Color PrimaryColor { get; set; } = Color.FromArgb(6, 182, 212);
-        public static Color SecondaryColor { get; set; } = Color.FromArgb(15, 23, 42);
-
-        public static List<string> ColorList = new List<string>
-        {
-            "#06B6D4", // Cyan
-            "#10B981", // Emerald
-            "#6366F1", // Indigo
-            "#8B5CF6", // Violet
-            "#F59E0B", // Amber
-            "#F43F5E", // Rose Red
-            "#0EA5E9", // Sky Blue
-            "#3B82F6", // Royal Blue
-            "#EC4899"  // Pink
-        };
-
-        public static Color ChangeColorBrightness(Color color, double correctionFactor)
-        {
-            double red = color.R;
-            double green = color.G;
-            double blue = color.B;
-
-            if (correctionFactor < 0)
-            {
-                correctionFactor = 1 + correctionFactor;
-                red *= correctionFactor;
-                green *= correctionFactor;
-                blue *= correctionFactor;
-            }
-            else
-            {
-                red = (255 - red) * correctionFactor + red;
-                green = (255 - green) * correctionFactor + green;
-                blue = (255 - blue) * correctionFactor + blue;
+                foreach (var (NumPedido, Cliente, Importe, Hora, Estado) in recentOrders)
+                {
+                    var item = new ListViewItem(NumPedido);
+                    item.SubItems.Add(Cliente);
+                    item.SubItems.Add($"{Importe:F2} €");
+                    item.SubItems.Add(Hora.ToString("HH:mm:ss"));
+                    item.SubItems.Add(Estado);
+                    item.ForeColor = Estado.Contains("Pendiente")
+                        ? Color.FromArgb(245, 158, 11)
+                        : (isDark ? Color.FromArgb(57, 255, 20) : Color.FromArgb(21, 128, 61));
+                    listView.Items.Add(item);
+                }
             }
 
-            return Color.FromArgb(color.A, (byte)Math.Clamp((int)red, 0, 255), (byte)Math.Clamp((int)green, 0, 255), (byte)Math.Clamp((int)blue, 0, 255));
+            pedForm.Controls.Add(listView);
+            pedForm.Controls.Add(pnlTop);
+            pedForm.ShowDialog(this);
         }
     }
 }

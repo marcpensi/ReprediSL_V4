@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
-**Fecha de actualización:** 08-09-2026  
-**Versión:** 4.2.0  
-**Estado General:** Estable y Operativo (Consolidación V4.2.0 - Demonio Nativo C# .NET 10 con Patrones de UI Moderno RJ Code Advance, Arrastre Suave Nativo y Temas Multicolor)
+**Fecha de actualización:** 09-09-2026  
+**Versión:** 4.3.0  
+**Estado General:** Estable y Operativo (Consolidación V4.3.0 - Dashboard de Telemetría Avanzado, Pipeline Visual, Segmented Pill Switch y Estandarización UTF-8 BOM en Demonio C# .NET 10)
 
 ---
 
@@ -21,6 +21,7 @@
 - [x] **Suite de Pruebas Unitarias:** 5/5 pruebas unitarias automatizadas con la suite nativa de Node.js (`npm test`).
 - [x] **Actualizador Automático MDB y Sync en Lote:** Módulo VBA `modActBdApi.bas` optimizado con `BATCH_SIZE = 500`, DDL dinámico para campos/consultas API, y logging en vivo.
 - [x] **Demonio Nativo C# WinForms (.NET 10):** Migración a ejecutable nativo `.exe` en `src/Daemon/bin/ReprediTrayDaemon.exe` (.NET 10), protección de instancia única con Mutex local, consumo mínimo de RAM (~25MB), monitoreo visual en tiempo real con resaltado de logs en ROJO/NARANJA/VERDE y diálogo de control de ráfagas de errores (>3) con opciones de cancelación o continuación en silencio.
+- [x] **Dashboard de Telemetría y Pipeline Visual (V4.3.0):** Rediseño completo de la interfaz WinForms con Segmented Pill Switch (Auto vs Manual), diagrama visual reactivo de Pipeline de datos (Postgres 16 ⇄ PsSyncBridge ⇄ Access ERP), 4 tarjetas métricas (Reloj sinc, Uptime, Procesados, Pendientes), barra de sub-métricas, visor modal de pedidos y estandarización estricta UTF-8 con BOM en código fuente C#.
 - [x] **Integración con Servidor MCP-Access:** Configuración oficial del servidor MCP (`luna-soft.access-explorer`) en `.vscode/mcp.json` para consulta e inspección de `gestion.mdb` asistida por IA.
 - [x] **Sincronización Dinámica Postgres (`DROP CASCADE`):** Recreación automática de tablas en PostgreSQL con `DROP TABLE ... CASCADE` en `modActBdApi.bas` para garantizar coincidencia total de esquemas con las consultas API.
 - [x] **Script de Migración .MDB Externo:** Automatización completa que clona `dborigen.mdb` -> `bddestino.mdb`, actualiza esquemas/consultas DAO e inyecta el código VBA sin intervención manual.

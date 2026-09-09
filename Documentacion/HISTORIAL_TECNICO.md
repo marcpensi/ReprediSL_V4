@@ -62,3 +62,31 @@ N/A
 
 ### Confirmado / Supuesto
 Confirmado
+
+---
+
+## 2026-09-09
+
+### Cambio
+Consolidación Release v4.3.0: Rediseño del panel WinForms con Dashboard de telemetría avanzado, pipeline visual reactivo (PostgreSQL ⇄ PsSyncBridge ⇄ Access ERP), conmutador segmentado de modo (Auto vs Manual), auditoría y aplicación obligatoria de UTF-8 con BOM en todos los fuentes C#.
+
+### Motivo
+Mejorar la observabilidad y control de la sincronización en tiempo real para el usuario del ERP, eliminar problemas de visualización de emojis y tildes en tiempo de ejecución, y certificar la suite de pruebas unitarias.
+
+### Componentes afectados
+- `src/Daemon/ReprediTrayDaemon/MainForm.cs`
+- `src/Daemon/ReprediTrayDaemon/Program.cs`
+- `src/Daemon/ReprediTrayDaemon/Services/DbSyncService.cs`
+- `Documentacion/00_EstadoProyecto.md`
+- `.gitignore`
+- `AGENTS.md`
+
+### Resultado
+OK (Tests 5/5 superados, dotnet build 0 errores, npm run build exitoso)
+
+### Relacionado con incidencia
+N/A
+
+### Confirmado / Supuesto
+Confirmado
+
