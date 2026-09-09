@@ -54,3 +54,9 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 ### 6. [`PUBLICAR_HOSTINGER.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PUBLICAR_HOSTINGER.bat) & [`PublicarHostingerMcp.mjs`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PublicarHostingerMcp.mjs)
 - **Objetivo:** Empaqueta y despliega automáticamente el contenido de `src/Frontend/dist` en el subdominio `https://pedidos.repredisl.com` utilizando el servidor oficial MCP de Hostinger (`hostinger-hosting-mcp`).
 
+### 7. [`ARRANCAR_CADDY.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ARRANCAR_CADDY.bat) & [`PARAR_CADDY.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/PARAR_CADDY.bat)
+- **Objetivo:** Inicia el proxy inverso Caddy Server para exponer `api.repredisl.com` con terminación HTTPS segura (puerto 443) y certificado Let's Encrypt automático, redirigiendo el tráfico a PostgREST (`127.0.0.1:3000`).
+
+### 8. [`ACTUALIZAR_DNS_HOSTINGER.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/ACTUALIZAR_DNS_HOSTINGER.bat) & [`ActualizarDnsApiHostinger.mjs`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/ActualizarDnsApiHostinger.mjs)
+- **Objetivo:** Detecta automáticamente la IP pública actual de la conexión de red y actualiza el registro DNS de tipo `A` para `api.repredisl.com` en los servidores de Hostinger a través del MCP `hostinger-dns-mcp`.
+
