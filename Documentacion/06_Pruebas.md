@@ -1,31 +1,75 @@
-# Estrategia y Registro de Pruebas - ReprediSL_V4
+# Estratègia i Registre de Proves - ReprediSL_V4
 
-**Estado de Pruebas:** Verificación de Compilación Completada | Tests Automatizados en Planificación
-
----
-
-## 1. Pruebas de Compilación y Sintaxis
-
-- **Herramienta:** Vite 6.0.5 (`vite build`)
-- **Resultado:** **EXITOSO (0 errores)**
-- **Detalles del Build:**
-  - 1.800 módulos transformados e integrados.
-  - Tiempo total de compilación: 6.85 segundos.
-  - Bundle generado en `src/Frontend/dist`.
+**Estat de Proves:** Verificació de Compilació Completada | Tests Automatitzats Implementats (8/8)
 
 ---
 
-## 2. Pruebas de Persistencia y API (Manuales)
+## 1. Proves de Compilació i Sintaxi
 
-- **Búsqueda con Debounce:** Verificado el envío de peticiones HTTP `GET /clientes?or=...` tras 300ms de inactividad de teclado.
-- **IndexedDB Fallback:** Verificada la carga de hasta 300 clientes en la base de datos `REPREDISL` del navegador en modo offline.
-- **Generación de PDF:** Verificada la creación y descarga de documentos de pedido en cliente usando `jsPDF`.
+- **Eina:** Vite 6.0.5 (`vite build`)
+- **Resultat:** **EXITÓS (0 errors)**
+- **Detalls del Build:**
+  - 1.800 mòduls transformats i integrats.
+  - Temps total de compilació: 6.85 segons.
+  - Bundle generat a `src/Frontend/dist`.
 
 ---
 
-## 3. Plan de Pruebas Automatizadas (Próxima Fase)
+## 2. Proves de Persistència i API (Manuals)
 
-- **Directorio de Tests:** `tests/`
-- **Áreas a Cubrir:**
-  1. Unit Tests para normalización de respuesta de clientes en [`clientApi.js`](file:///d:/programacio/repredi/ReprediSL_V4/src/Frontend/src/clientApi.js).
-  2. Integration Tests para sincronización de IndexedDB en [`db.js`](file:///d:/programacio/repredi/ReprediSL_V4/src/Frontend/src/db.js).
+- **Cerca amb Debounce:** Verificat l'enviament de peticions HTTP `GET /clients?or=...` després de 300ms d'inactivitat de teclat.
+- **IndexedDB Fallback:** Verificada la càrrega de fins a 300 clients a la base de dades `REPREDISL` del navegador en mode offline.
+- **Generació de PDF:** Verificada la creació i descàrrega de documents de comanda en client utilitzant `jsPDF`.
+
+---
+
+## 3. Suite de Proves Automatitzades (Implementada)
+
+- **Directori de Tests:** `tests/`
+- **Eina:** Node.js Test Runner (`node --test`)
+- **Total de Tests:** 8 proves automatitzades
+
+### 3.1 Tests Implementats
+
+#### `clientApi.test.js` (3 tests)
+1. ✅ `normalizeClient` - Normalitza un objecte de client provinent de PostgREST
+2. ✅ `normalizeProduct` - Normalitza valors i tipus de dades d'un producte
+3. ✅ `normalizeProduct` - Assigna valors per defecte segurs davant camps buits
+
+#### `products.test.js` (2 tests)
+4. ✅ `calculateOrderTotal` - Calcula subtotal, IVA 21% i total correctament
+5. ✅ `calculateOrderTotal` - Maneja comandes buides amb total zero
+
+#### `dbSync.test.js` (3 tests) - NOU
+6. ✅ `normalizeClient` - Gestiona camps buits o indefinits correctament
+7. ✅ `normalizeClient` - Preserva valors numèrics en codi de client
+8. ✅ `normalizeClient` - Normalitza adreces de lliurament quan són buides
+
+### 3.2 Execució de Tests
+
+Per executar tota la suite de proves:
+
+```bash
+npm test
+```
+
+O específicament:
+
+```bash
+node --test tests/*.test.js
+```
+
+### 3.3 Cobertura de Funcionalitats
+
+- **Normalització de Dades:** Clients i productes
+- **Càlculs Comercials:** Subtotal, IVA, totals de comanda
+- **Gestió de Errors:** Valors buits, nulls, undefined
+- **Fallbacks:** Adreces de lliurament, noms per defecte
+
+---
+
+## 4. Pròximes Passes en Qualitat
+
+- [ ] Implementar proves d'integració per a sincronització IndexedDB
+- [ ] Afegir proves E2E amb Playwright o Cypress
+- [ ] Configurar cobertura de codi amb c8 o istanbul
