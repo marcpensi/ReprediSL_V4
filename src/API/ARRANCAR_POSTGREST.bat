@@ -1,18 +1,15 @@
 @echo off
 chcp 65001 > nul
 title REPREDISL API - PostgREST (127.0.0.1:3000)
+cd /d "%~dp0"
 
 echo ================================================
 echo  REPREDISL API - POSTGREST (PUERTO 3000)
 echo ================================================
 echo.
 
-if exist "%~dp0..\..\src\API\postgrest.exe" (
-    cd /d "%~dp0..\..\src\API"
-) else if exist "%~dp0postgrest.exe" (
-    cd /d "%~dp0"
-) else (
-    echo [ERROR] No se encuentra postgrest.exe en src\API ni en la carpeta actual.
+if not exist "%~dp0postgrest.exe" (
+    echo [ERROR] No se encuentra postgrest.exe en %~dp0
     pause
     exit /b 1
 )
