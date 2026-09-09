@@ -10,3 +10,5 @@ obj/
 *.laccdb
 .vs/
 *.user
+*.zip
+*.rar

@@ -194,7 +194,7 @@ El sistema se compone de 4 subsistemas principales:
    El demonio y los scripts buscan `gestion.mdb` en las siguientes ubicaciones prioritarias:
    - `D:\programacio\repredi\ReprediSL_V4\src\Access\E0012026\gestion.mdb`
    - `D:\programacio\repredi\ReprediSL_V4\src\Access\gestion.mdb`
-   - `C:\PsGest\E0012026\gestion.mdb`
+   - `C:\Pensi\PsGest\E0012026\gestion.mdb`
 
 2. **Actualizar Consultas e Inyectar Código VBA:**
    Para aplicar automáticamente las 5 consultas API (`QryClientesApi`, `QryProductosApi`, `QryTarifasApi`, etc.) e inyectar `modActBdApi.bas`:

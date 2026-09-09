@@ -1,7 +1,6 @@
-\
-    @echo off
-    title REPREDISL - Build Produccion
-    cd /d "%~dp0"
+@echo off
+title REPREDISL - Build Produccion
+cd /d "%~dp0..\..\src\Frontend"
 
     echo ================================================
     echo REPREDISL - GENERAR VERSION PARA HOSTINGER

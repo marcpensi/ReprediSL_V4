@@ -50,3 +50,7 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 
 ### 5. `BUILD_PRODUCCION.bat`
 - **Objetivo:** Ejecuta la compilación de Vite en `src/Frontend`.
+
+### 6. [`PUBLICAR_HOSTINGER.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PUBLICAR_HOSTINGER.bat) & [`PublicarHostingerMcp.mjs`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PublicarHostingerMcp.mjs)
+- **Objetivo:** Empaqueta y despliega automáticamente el contenido de `src/Frontend/dist` en el subdominio `https://pedidos.repredisl.com` utilizando el servidor oficial MCP de Hostinger (`hostinger-hosting-mcp`).
+
