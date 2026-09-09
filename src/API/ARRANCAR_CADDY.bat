@@ -7,11 +7,12 @@ echo =========================================================
 echo  REPREDISL API - CADDY REVERSE PROXY (HTTPS 443)
 echo =========================================================
 echo.
-echo  Dominio público:   https://api.repredisl.com
+echo  Dominio publico:   https://api.repredisl.com
 echo  Destino interno:   http://127.0.0.1:3000 (PostgREST)
-echo  Certificado SSL:   Automático con Let's Encrypt (Caddy)
+echo  Certificado SSL:   Automatico con Let's Encrypt (Caddy)
 echo.
 
+set "CADDY_BIN=caddy"
 where caddy > nul 2>&1
 if %errorlevel% neq 0 (
     if exist "%USERPROFILE%\scoop\shims\caddy.exe" (
@@ -21,18 +22,16 @@ if %errorlevel% neq 0 (
         pause
         exit /b 1
     )
-) else (
-    set "CADDY_BIN=caddy"
 )
 
 if not exist "%~dp0Caddyfile" (
-    echo [ERROR] No se ha encontrado Caddyfile en esta carpeta.
+    echo [ERROR] No se ha encontrado Caddyfile en %~dp0
     pause
     exit /b 1
 )
 
 echo Usando ejecutable:    %CADDY_BIN%
-echo Usando configuración: %~dp0Caddyfile
+echo Usando configuracion: %~dp0Caddyfile
 echo.
 echo Iniciando proxy inverso en primer plano...
 echo Presiona Ctrl + C para detener el servidor Caddy.
