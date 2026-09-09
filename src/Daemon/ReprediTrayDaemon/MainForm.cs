@@ -91,17 +91,42 @@ namespace ReprediTrayDaemon
         [System.Runtime.InteropServices.DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(System.IntPtr hWnd, int wMsg, int wParam, int lParam);
 
+        private static string ResolveProjectRoot()
+        {
+            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "AGENTS.md")) &&
+                    Directory.Exists(Path.Combine(dir.FullName, "Scripts", "BaseDatos")))
+                {
+                    return dir.FullName;
+                }
+
+                if (Directory.Exists(Path.Combine(dir.FullName, "Scripts", "BaseDatos")) &&
+                    Directory.Exists(Path.Combine(dir.FullName, "src", "Daemon")))
+                {
+                    return dir.FullName;
+                }
+
+                dir = dir.Parent;
+            }
+
+            string fallback = @"D:\programacio\repredi\ReprediSL_V4";
+            if (Directory.Exists(fallback))
+            {
+                return fallback;
+            }
+
+            return AppDomain.CurrentDomain.BaseDirectory;
+        }
+
         public MainForm()
         {
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
 
-            string projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
-            if (!File.Exists(Path.Combine(projectRoot, "AGENTS.md")))
-            {
-                projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
-            }
+            string projectRoot = ResolveProjectRoot();
 
             settingsFilePath = Path.Combine(projectRoot, "src", "Access", "ui_settings.json");
 

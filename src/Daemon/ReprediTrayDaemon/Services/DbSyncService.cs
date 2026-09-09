@@ -35,13 +35,40 @@ namespace ReprediTrayDaemon.Services
 
         public DbSyncService(string projectRoot)
         {
-            ProjectRoot = projectRoot;
+            ProjectRoot = ResolveFallbackProjectRoot(projectRoot);
             ProgressLogPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
             AltProgressLogPath = Path.Combine(ProjectRoot, "src", "Access", "E0012026", "sync_progress.log");
             ErrorLogPath = Path.Combine(ProjectRoot, "src", "Access", "sync_errors.log");
 
             ResolveMdbPath();
             InitLogOffsets();
+        }
+
+        private static string ResolveFallbackProjectRoot(string candidate)
+        {
+            if (!string.IsNullOrWhiteSpace(candidate) &&
+                File.Exists(Path.Combine(candidate, "Scripts", "BaseDatos", "EjecutarExportacionAccess.ps1")))
+            {
+                return candidate;
+            }
+
+            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "Scripts", "BaseDatos", "EjecutarExportacionAccess.ps1")))
+                {
+                    return dir.FullName;
+                }
+                dir = dir.Parent;
+            }
+
+            string fallback = @"D:\programacio\repredi\ReprediSL_V4";
+            if (Directory.Exists(fallback))
+            {
+                return fallback;
+            }
+
+            return candidate;
         }
 
         public void ResetErrorCounter()
