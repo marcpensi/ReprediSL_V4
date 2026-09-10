@@ -3,116 +3,350 @@ param (
     [int]$IntervaloSegundos = 3
 )
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
 $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) {
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 }
 $ProjectRoot = (Get-Item (Join-Path $ScriptDir "..\..")).FullName
+$logPath = Join-Path $ProjectRoot "src\Access\sync_progress.log"
 
-$logPath = Join-Path $ProjectRoot "src/Access/sync_progress.log"
-$pathMdb = "C:\pensi\psgestw\e0012026\gestion.mdb"
-if (-not (Test-Path $pathMdb)) {
-    $pathMdb = Join-Path $ProjectRoot "src/Access/E0012026/gestion.mdb"
+$pathMdb = "C:\PENSI\PSGESTW\E0012026\gestion.mdb"
+if (-not (Test-Path -LiteralPath $pathMdb)) {
+    $pathMdb = Join-Path $ProjectRoot "src\Access\E0012026\gestion.mdb"
 }
-if (-not (Test-Path $pathMdb)) {
-    $pathMdb = Join-Path $ProjectRoot "src/Access/gestion.mdb"
+if (-not (Test-Path -LiteralPath $pathMdb)) {
+    $pathMdb = Join-Path $ProjectRoot "src\Access\gestion.mdb"
 }
 
-function Log-Sync([string]$msg) {
+function Log-Sync([string]$Message) {
     $timestamp = (Get-Date).ToString("HH:mm:ss")
-    $line = "[$timestamp] $msg"
+    $line = "[$timestamp] $Message"
     Write-Host $line
+
     try {
-        [System.IO.File]::AppendAllText($logPath, "$line`r`n", [System.Text.Encoding]::UTF8)
-    } catch {
-        # Silencioso si otro proceso está leyendo el log
+        $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+        [System.IO.File]::AppendAllText($logPath, "$line`r`n", $utf8Bom)
+    }
+    catch {
+        Write-Warning "No se pudo escribir en el registro: $($_.Exception.Message)"
     }
 }
 
-function Sincronizar-Pedidos-UnaVez {
-    # 1. Consultar pedidos pendientes en PostgreSQL
-    $sqlSelect = "SELECT id, id_empresa, ejercicio, serie, numero_pedido, fecha, id_cliente, cliente, id_forma_pago, id_tarifa, total, canal, id_vendedor, lineas::text as lineas_json FROM public.pedidos_nuevos WHERE estado = 'N' AND synced_at IS NULL ORDER BY id ASC;"
-    
-    $cmd = "psql -U postgres -d psgest-online -t -A -F `"`t`" -c `"$sqlSelect`""
-    $rows = Invoke-Expression $cmd
+function Convertir-Decimal([object]$Value, [double]$DefaultValue = 0.0) {
+    if ($Value -is [System.Array]) {
+        $Value = @($Value)[0]
+    }
 
+    if ($null -eq $Value -or [string]::IsNullOrWhiteSpace("$Value")) {
+        return $DefaultValue
+    }
+
+    $text = "$Value".Trim().Replace("€", "").Replace("pta", "").Trim()
+
+    if ($text.Contains(",") -and $text.Contains(".")) {
+        $text = $text.Replace(".", "").Replace(",", ".")
+    }
+    elseif ($text.Contains(",")) {
+        $text = $text.Replace(",", ".")
+    }
+
+    return [Convert]::ToDouble(
+        $text,
+        [System.Globalization.CultureInfo]::InvariantCulture
+    )
+}
+
+function Sql-Decimal([object]$Value) {
+    $number = Convertir-Decimal $Value
+    return $number.ToString(
+        "0.00####",
+        [System.Globalization.CultureInfo]::InvariantCulture
+    )
+}
+
+function Sql-Text([object]$Value) {
+    if ($Value -is [System.Array]) {
+        $Value = @($Value)[0]
+    }
+    if ($null -eq $Value) { return "" }
+    return ([string]$Value).Replace("'", "''")
+}
+
+function Resolver-TipoIva([double]$Porcentaje) {
+    $tipos = @(
+        @{ Codigo = 1; Porcentaje = 10.0 },
+        @{ Codigo = 2; Porcentaje = 21.0 },
+        @{ Codigo = 3; Porcentaje = 4.0 },
+        @{ Codigo = 4; Porcentaje = 0.0 },
+        @{ Codigo = 5; Porcentaje = 0.0 },
+        @{ Codigo = 6; Porcentaje = 5.0 },
+        @{ Codigo = 7; Porcentaje = 2.0 },
+        @{ Codigo = 8; Porcentaje = 7.5 }
+    )
+
+    $coincidencia = $tipos |
+        Sort-Object { [Math]::Abs($_.Porcentaje - $Porcentaje) } |
+        Select-Object -First 1
+
+    if ([Math]::Abs($coincidencia.Porcentaje - $Porcentaje) -gt 0.15) {
+        throw "No se puede asociar el IVA calculado ($Porcentaje %) con TiposIva."
+    }
+
+    return [int]$coincidencia.Codigo
+}
+
+function Obtener-Items([string]$Json) {
+    if ([string]::IsNullOrWhiteSpace($Json)) { return @() }
+
+    $parsedItems = ConvertFrom-Json -InputObject $Json
+    if ($parsedItems -is [System.Array]) {
+        return $parsedItems
+    }
+    return @($parsedItems)
+}
+
+function Sincronizar-Pedidos-UnaVez {
+    if (-not (Test-Path -LiteralPath $pathMdb)) {
+        throw "No se encuentra gestion.mdb en ninguna ruta configurada."
+    }
+
+    $sqlSelect = @"
+SELECT id, id_empresa, ejercicio, serie, numero_pedido, fecha, id_cliente,
+       cliente, id_forma_pago, id_tarifa, total, canal, id_vendedor,
+       lineas::text AS lineas_json
+FROM public.pedidos_nuevos
+WHERE estado = 'N' AND synced_at IS NULL
+ORDER BY id ASC;
+"@
+
+    $rows = & psql -X -v ON_ERROR_STOP=1 -U postgres -d repredisl_api `
+        -t -A -F "`t" -c $sqlSelect
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "No se pudieron consultar los pedidos pendientes en PostgreSQL."
+    }
     if (-not $rows) { return 0 }
 
     $count = 0
-    $cn = $null
+    $cn = New-Object -ComObject ADODB.Connection
 
     try {
-        $cn = New-Object -ComObject ADODB.Connection
         $cn.Open("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$pathMdb")
 
-        foreach ($row in $rows) {
+        foreach ($rowValue in @($rows)) {
+            $row = [string]$rowValue
             if ([string]::IsNullOrWhiteSpace($row)) { continue }
+
             $fields = $row.Split("`t")
-            if ($fields.Length -lt 14) { continue }
-
-            $idPg        = $fields[0].Trim()
-            $idEmpresa   = if ($fields[1].Trim()) { [int]$fields[1].Trim() } else { 1 }
-            $ejercicio   = if ($fields[2].Trim()) { [int]$fields[2].Trim() } else { [int](Get-Date).Year }
-            $serie       = if ($fields[3].Trim()) { $fields[3].Trim() } else { "VD" }
-            $numPedido   = if ($fields[4].Trim()) { [int]$fields[4].Trim() } else { 2988 }
-            $fechaStr    = $fields[5].Trim()
-            $idCliente   = if ($fields[6].Trim()) { [int]$fields[6].Trim() } else { 1001 }
-            $clienteNom  = $fields[7].Trim()
-            $idFormaPago = if ($fields[8].Trim()) { [int]$fields[8].Trim() } else { 1 }
-            $idTarifa    = if ($fields[9].Trim()) { [int]$fields[9].Trim() } else { 1 }
-            $totalStr    = $fields[10].Trim().Replace(",", ".")
-            $canal       = if ($fields[11].Trim()) { $fields[11].Trim() } else { "movil" }
-            $idVendedor  = if ($fields[12].Trim()) { [int]$fields[12].Trim() } else { 13 }
-            $lineasJson  = $fields[13].Trim()
-
-            $numPedDisplay = if ($serie) { "$serie-$numPedido" } else { "VD-$numPedido" }
-            Log-Sync "[NUEVO PEDIDO] Recibido pedido N. $numPedDisplay | Serie: $serie | Cliente: $idCliente ($clienteNom) | Importe: $totalStr EUR"
-
-            # 2. Insertar en PedidosCab de Access
-            $sqlCab = "INSERT INTO PedidosCab (IdEmpresa, Ejercicio, Serie, NumPedido, Fecha, IdCliente, IdFormaPago, IdTarifa, Total, Canal, IdVendedor) VALUES ($idEmpresa, $ejercicio, '$serie', $numPedido, Now(), $idCliente, $idFormaPago, $idTarifa, $totalStr, '$canal', $idVendedor);"
-            try {
-                $cn.Execute($sqlCab) | Out-Null
-            } catch {
-                Log-Sync "[WARN] PedidosCab insercion aviso/error: $_"
+            if ($fields.Length -lt 14) {
+                Log-Sync "[ERROR] PostgreSQL devolvió una fila incompleta; no se procesa."
+                continue
             }
 
-            # 3. Insertar líneas en PedidosLin de Access
-            if ($lineasJson) {
-                try {
-                    $items = ConvertFrom-Json $lineasJson
-                    $numLinea = 1
-                    foreach ($item in $items) {
-                        $idArticulo = if ($item.code) { $item.code } else { 1 }
-                        $desc = if ($item.desc) { $item.desc.Replace("'", "''") } else { "Articulo" }
-                        $qty = if ($item.qty) { [double]$item.qty } else { 1 }
-                        $price = if ($item.price) { [double]$item.price } else { 0 }
-                        $neto = [Math]::Round($qty * $price, 2)
+            $idPg = [long]$fields[0].Trim()
+            $serie = Sql-Text $(if ($fields[3].Trim()) { $fields[3].Trim() } else { "VD" })
+            $numPedido = [int]$fields[4].Trim()
+            $idCliente = [long]$fields[6].Trim()
+            $clienteNom = Sql-Text $fields[7].Trim()
+            $formaPago = Sql-Text $(if ($fields[8].Trim()) { $fields[8].Trim() } else { "1" })
+            $idTarifa = if ($fields[9].Trim()) { [int]$fields[9].Trim() } else { 1 }
+            $total = Convertir-Decimal $fields[10]
+            $idVendedor = if ($fields[12].Trim()) { [int]$fields[12].Trim() } else { 13 }
+            $items = @(Obtener-Items $fields[13].Trim())
 
-                        $priceStr = $price.ToString([System.Globalization.CultureInfo]::InvariantCulture)
-                        $netoStr  = $neto.ToString([System.Globalization.CultureInfo]::InvariantCulture)
-                        $qtyStr   = $qty.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+            if ($items.Count -eq 0) {
+                Log-Sync "[ERROR] Pedido $serie-$numPedido sin líneas; permanece pendiente."
+                continue
+            }
 
-                        $sqlLin = "INSERT INTO PedidosLin (IdEmpresa, Ejercicio, Serie, NumPedido, NumLinea, IdArticulo, Descripcion, Cajas, UdsCaja, Unidades, Precio, Dto1, Dto2, ImporteNeto, IdTipoIva, Iva, Recargo) VALUES ($idEmpresa, $ejercicio, '$serie', $numPedido, $numLinea, '$idArticulo', '$desc', 1, $qtyStr, $qtyStr, $priceStr, 0, 0, $netoStr, 1, 21, 0);"
-                        $cn.Execute($sqlLin) | Out-Null
-                        $numLinea++
-                    }
-                } catch {
-                    Log-Sync "[WARN] Error parseando/insertando lineas: $_"
+            $lineas = @()
+            $importeBase = 0.0
+            $numeroLinea = 1
+
+            foreach ($itemValue in $items) {
+                $item = $itemValue
+                if ($item -is [System.Array]) { $item = @($item)[0] }
+
+                $unidades = Convertir-Decimal $item.qty 1.0
+                $precio = Convertir-Decimal $item.price 0.0
+                $importe = [Math]::Round(
+                    $unidades * $precio,
+                    2,
+                    [MidpointRounding]::AwayFromZero
+                )
+
+                $tipoIvaItem = $null
+                if ($null -ne $item.tipoIva -and "$($item.tipoIva)" -ne "") {
+                    $tipoIvaItem = [int](@($item.tipoIva)[0])
+                }
+
+                $lineas += [pscustomobject]@{
+                    Numero      = $numeroLinea
+                    Articulo    = Sql-Text $item.code
+                    Descripcion = Sql-Text $(if ($item.desc) { $item.desc } else { "Artículo" })
+                    Unidades    = $unidades
+                    Precio      = $precio
+                    Importe     = $importe
+                    TipoIva     = $tipoIvaItem
+                }
+
+                $importeBase += $importe
+                $numeroLinea++
+            }
+
+            $importeBase = [Math]::Round(
+                $importeBase,
+                2,
+                [MidpointRounding]::AwayFromZero
+            )
+            $importeIva = [Math]::Round(
+                $total - $importeBase,
+                2,
+                [MidpointRounding]::AwayFromZero
+            )
+
+            if ($importeBase -lt 0) {
+                throw "La base del pedido $serie-$numPedido no puede ser negativa."
+            }
+            if ($importeIva -lt 0) {
+                throw "El total del pedido $serie-$numPedido es inferior a su base imponible."
+            }
+
+            $porcentajeGlobal = if ($importeBase -eq 0) {
+                0.0
+            } else {
+                [Math]::Round(($importeIva / $importeBase) * 100, 2)
+            }
+            $tipoIvaGlobal = Resolver-TipoIva $porcentajeGlobal
+
+            foreach ($linea in $lineas) {
+                if ($null -eq $linea.TipoIva) {
+                    $linea.TipoIva = $tipoIvaGlobal
                 }
             }
 
-            # 4. Marcar como sincronizado en PostgreSQL
-            $sqlUpdate = "UPDATE public.pedidos_nuevos SET estado = 'S', synced_at = NOW() WHERE id = $idPg;"
-            Invoke-Expression "psql -U postgres -d psgest-online -c `"$sqlUpdate`"" | Out-Null
+            $baseSql = Sql-Decimal $importeBase
+            $ivaSql = Sql-Decimal $importeIva
+            $totalSql = Sql-Decimal $total
 
-            Log-Sync "[SYNC] INSERT INTO PedidosCab (Serie, NumPedido, Cliente, Total) VALUES ('$serie', $numPedido, '$clienteNom', $totalStr) -> Confirmado en gestion.mdb ($pathMdb) [OK]."
+            Log-Sync "[NUEVO PEDIDO] $serie-$numPedido | Cliente: $idCliente ($clienteNom) | Total: $totalSql EUR"
+
+            $cn.BeginTrans() | Out-Null
+            try {
+                $rs = $cn.Execute(
+                    "SELECT COUNT(*) AS N FROM PedVentas " +
+                    "WHERE Serie='$serie' AND Numero=$numPedido;"
+                )
+                $yaExiste = [int]$rs.Fields.Item("N").Value -gt 0
+                $rs.Close()
+
+                if ($yaExiste) {
+                    throw "El pedido $serie-$numPedido ya existe en PedVentas."
+                }
+
+                $sqlCabecera = @"
+INSERT INTO PedVentas
+(Serie, Numero, Cliente, Fecha, Descuento, DescuentoPP, Irpf, FormaPago,
+ RecargoSN, Tarifa, Kilometros, Vendedor, TipoVenta, EnlazadoSN, ImpresoSN,
+ ImporteBruto, ImporteDto, ImporteDtoPP, ImporteBase, ImporteIva,
+ ImporteRec, ImporteTotal, ImporteManoObra)
+VALUES
+('$serie', $numPedido, $idCliente, Now(), 0, 0, 0, '$formaPago',
+ False, $idTarifa, 0, $idVendedor, 'ODOO', False, False,
+ $baseSql, 0, 0, $baseSql, $ivaSql, 0, $totalSql, 0);
+"@
+                $cn.Execute($sqlCabecera) | Out-Null
+
+                foreach ($linea in $lineas) {
+                    $unidadesSql = Sql-Decimal $linea.Unidades
+                    $precioSql = Sql-Decimal $linea.Precio
+                    $importeLineaSql = Sql-Decimal $linea.Importe
+
+                    $sqlLinea = @"
+INSERT INTO LineasPedVentas
+(Serie, NumPed, Linea, Tipo, Articulo, Descripcion, Columna1, Columna2,
+ Columna3, Unidades, Precio, Descuento, Importe, TipoIva, ReservaSN,
+ ImporteCom, UniServidas, UniPedidasCompra)
+VALUES
+('$serie', $numPedido, $($linea.Numero), 'A', '$($linea.Articulo)',
+ '$($linea.Descripcion)', 0, 0, 0, $unidadesSql, $precioSql, 0,
+ $importeLineaSql, $($linea.TipoIva), False, 0, 0, 0);
+"@
+                    $cn.Execute($sqlLinea) | Out-Null
+                }
+
+                $gruposIva = $lineas | Group-Object TipoIva
+                foreach ($grupo in $gruposIva) {
+                    $tipoIva = [int]$grupo.Name
+                    $baseGrupo = [Math]::Round(
+                        ($grupo.Group | Measure-Object Importe -Sum).Sum,
+                        2,
+                        [MidpointRounding]::AwayFromZero
+                    )
+
+                    $porcentajeGrupo = switch ($tipoIva) {
+                        1 { 10.0 }
+                        2 { 21.0 }
+                        3 { 4.0 }
+                        4 { 0.0 }
+                        5 { 0.0 }
+                        6 { 5.0 }
+                        7 { 2.0 }
+                        8 { 7.5 }
+                        default { throw "TipoIva desconocido: $tipoIva" }
+                    }
+
+                    $ivaGrupo = [Math]::Round(
+                        $baseGrupo * $porcentajeGrupo / 100,
+                        2,
+                        [MidpointRounding]::AwayFromZero
+                    )
+                    $totalGrupo = $baseGrupo + $ivaGrupo
+
+                    $baseGrupoSql = Sql-Decimal $baseGrupo
+                    $ivaGrupoSql = Sql-Decimal $ivaGrupo
+                    $totalGrupoSql = Sql-Decimal $totalGrupo
+
+                    $sqlIva = @"
+INSERT INTO IvaLineasPedVentas
+(Serie, NumPed, Tipo, ImporteBruto, ImporteDto, ImporteDtoPP,
+ ImporteBase, ImporteIva, ImporteRec, ImporteTotal)
+VALUES
+('$serie', $numPedido, $tipoIva, $baseGrupoSql, 0, 0,
+ $baseGrupoSql, $ivaGrupoSql, 0, $totalGrupoSql);
+"@
+                    $cn.Execute($sqlIva) | Out-Null
+                }
+
+                $cn.CommitTrans() | Out-Null
+            }
+            catch {
+                try { $cn.RollbackTrans() | Out-Null } catch {}
+                Log-Sync "[ERROR] Pedido $serie-$numPedido no insertado en Access: $($_.Exception.Message)"
+                continue
+            }
+
+            $sqlUpdate = @"
+UPDATE public.pedidos_nuevos
+SET estado = 'S', synced_at = NOW()
+WHERE id = $idPg AND estado = 'N' AND synced_at IS NULL;
+"@
+
+            & psql -X -v ON_ERROR_STOP=1 -U postgres -d repredisl_api `
+                -c $sqlUpdate | Out-Null
+
+            if ($LASTEXITCODE -ne 0) {
+                Log-Sync "[ERROR] $serie-$numPedido está en Access, pero no se pudo actualizar PostgreSQL."
+                continue
+            }
+
+            Log-Sync "[SYNC] $serie-$numPedido insertado en PedVentas, LineasPedVentas e IvaLineasPedVentas [OK]."
             $count++
         }
-    } catch {
-        Log-Sync "[ERROR] Error conectando a Access o procesando sincronizacion: $_"
-    } finally {
+    }
+    finally {
         if ($cn -and $cn.State -ne 0) {
             $cn.Close()
         }
@@ -122,12 +356,26 @@ function Sincronizar-Pedidos-UnaVez {
 }
 
 if ($Loop) {
-    Write-Host "Iniciando servicio de sincronizacion de pedidos entrantes (cada $IntervaloSegundos s)..." -ForegroundColor Cyan
+    Log-Sync "Sincronizador iniciado. Base Access: $pathMdb"
+
     while ($true) {
-        Sincronizar-Pedidos-UnaVez
+        try {
+            [void](Sincronizar-Pedidos-UnaVez)
+        }
+        catch {
+            Log-Sync "[ERROR] $($_.Exception.Message)"
+        }
+
         Start-Sleep -Seconds $IntervaloSegundos
     }
-} else {
-    $n = Sincronizar-Pedidos-UnaVez
-    Write-Host "Sincronizacion ejecutada. $n pedido(s) procesado(s)." -ForegroundColor Green
+}
+else {
+    try {
+        $n = Sincronizar-Pedidos-UnaVez
+        Write-Host "Sincronización ejecutada. $n pedido(s) procesado(s)." -ForegroundColor Green
+    }
+    catch {
+        Log-Sync "[ERROR] $($_.Exception.Message)"
+        exit 1
+    }
 }

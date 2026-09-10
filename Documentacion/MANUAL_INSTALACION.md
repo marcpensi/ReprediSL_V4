@@ -77,10 +77,10 @@ El sistema se compone de 4 subsistemas principales:
 2. **Crear la Base de Datos:**
    Abrir `psql` o `pgAdmin` y crear la base de datos:
    ```sql
-   CREATE DATABASE "psgest-online";
+   CREATE DATABASE "repredisl_api";
    ```
 3. **Crear Roles y Esquema de PostgREST:**
-   Conectar a la base de datos `psgest-online` y ejecutar:
+   Conectar a la base de datos `repredisl_api` y ejecutar:
    ```sql
    -- Crear esquema api
    CREATE SCHEMA IF NOT EXISTS api;
@@ -101,7 +101,7 @@ El sistema se compone de 4 subsistemas principales:
    - En Windows, abrir **Orígenes de datos ODBC (ODBC Data Sources)**.
    - En la pestaña **DSN de sistema**, agregar un nuevo origen usando `PostgreSQL Unicode`:
      - **Data Source:** `PostgreSQL35W` (o el nombre configurado en `modActBdApi.bas`)
-     - **Database:** `psgest-online`
+     - **Database:** `repredisl_api`
      - **Server:** `localhost`
      - **Port:** `5432`
      - **User Name:** `postgres` o `authenticator`
@@ -113,7 +113,7 @@ El sistema se compone de 4 subsistemas principales:
 1. **Configurar el archivo de PostgREST:**
    Revisar o editar el archivo `src\API\postgrest.conf`:
    ```ini
-   db-uri = "postgres://authenticator:Marc@localhost:5432/psgest-online"
+   db-uri = "postgres://authenticator:Marc@localhost:5432/repredisl_api"
    db-schemas = "api"
    db-anon-role = "web_anon"
 
@@ -270,7 +270,7 @@ Antes de dar por completada la instalación, comprobar cada uno de los siguiente
 
 ### 2. PostgREST se cierra inmediatamente al arrancar
 - **Causa:** Contraseña incorrecta en `db-uri`, PostgreSQL apagado o puerto 5432 inaccesible.
-- **Solución:** Verificar que el servicio PostgreSQL esté activo en Windows (`services.msc`) y probar la conexión con `psql -U authenticator -d psgest-online -h localhost`.
+- **Solución:** Verificar que el servicio PostgreSQL esté activo en Windows (`services.msc`) y probar la conexión con `psql -U authenticator -d repredisl_api -h localhost`.
 
 ### 3. Emojis o caracteres extraños en el Demonio WinForms (`ðŸ—„ï¸` o `Ã±`)
 - **Causa:** Archivo `MainForm.cs` guardado sin BOM en UTF-8 estándar o ANSI.

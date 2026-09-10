@@ -68,3 +68,6 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 
 ### 11. [`SincronizarPedidosEntrantes.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/BaseDatos/SincronizarPedidosEntrantes.ps1) & [`ARRANCAR_SYNC_PEDIDOS.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ARRANCAR_SYNC_PEDIDOS.bat)
 - **Objetivo:** Proceso en segundo plano que consulta pedidos nuevos en PostgreSQL (`public.pedidos_nuevos`), notifica en tiempo real a `sync_progress.log` para disparar las alertas en `ReprediTrayDaemon.exe` e inserta automáticamente los registros en `PedidosCab` y `PedidosLin` de Microsoft Access (`gestion.mdb`).
+
+### 12. [`CONFIGURAR_HOSTS_LOCAL.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/CONFIGURAR_HOSTS_LOCAL.bat)
+- **Objetivo:** Añade `127.0.0.1 api.repredisl.com` al archivo `hosts` de Windows (`C:\Windows\System32\drivers\etc\hosts`) ejecutado como Administrador, permitiendo que navegadores en el mismo equipo donde se ejecuta el servidor conecten directamente a la API HTTPS sin verse bloqueados por la falta de NAT Loopback en el router local.

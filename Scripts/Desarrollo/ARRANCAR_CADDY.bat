@@ -37,10 +37,10 @@ echo Usando ejecutable:    %CADDY_BIN%
 echo Usando configuracion: %CADDYFILE%
 echo.
 echo Comprobando si Caddy ya esta en ejecucion...
-tasklist /FI "IMAGENAME eq caddy.exe" 2>NUL | find /I /N "caddy.exe">NUL
-if "%ERRORLEVEL%"=="0" (
-    echo [INFO] Caddy ya esta ejecutandose en segundo plano (puertos 80 y 443 activos).
-    echo Si deseas reiniciar Caddy, ejecuta primero PARAR_CADDY.bat.
+tasklist /fi "imagename eq caddy.exe" 2>nul | findstr /i "caddy.exe" >nul
+if %errorlevel% equ 0 (
+    echo [INFO] Caddy ya esta ejecutandose en segundo plano.
+    echo Si deseas reiniciar Caddy, ejecuta primero PARAR_CADDY.bat
     echo ---------------------------------------------------------
     pause
     exit /b 0
