@@ -74,3 +74,7 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 
 ### 13. [`ENFORCE_UTF8_BOM.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ENFORCE_UTF8_BOM.ps1)
 - **Objetivo:** Utilidad de cumplimiento estricto de gobernanza de código que escanea todos los archivos `.cs` de `ReprediTrayDaemon` y re-guarda con codificación UTF-8 con BOM (Codepage 65001 con preámbulo `EF BB BF`) para evitar corrupción de caracteres en emojis y textos en español.
+
+### 14. [`AplicarV47.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Migracion/AplicarV47.ps1)
+- **Objetivo:** Script de migración y aplicación de componentes v4.7.0 (`Catalogo.jsx`, `NuevoPedido.jsx` y estilos CSS) con respaldo automático previo.
+

@@ -13,3 +13,5 @@ obj/
 *.zip
 *.rar
 ui_settings.json
+backups/
+*.bak

@@ -11,6 +11,7 @@ Este directorio contiene la documentación técnica y funcional oficial del proy
 - [`04_Desarrollo.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/04_Desarrollo.md): Guía de instalación, comandos de Vite y scripts de backend.
 - [`05_Despliegue.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/05_Despliegue.md): Instrucciones de despliegue para producción (Hostinger, Caddy, PostgREST).
 - [`MANUAL_INSTALACION.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/MANUAL_INSTALACION.md): Manual paso a paso de instalación, configuración integral de dependencias, base de datos, API, demonio C# y verificación.
+- [`Instalacion_46_47.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/Instalacion_46_47.md): Guía de instalación de las modificaciones v4.6.0 (PIN de seguridad e historial) y v4.7.0 (Catálogo y NuevoPedido).
 - [`06_Pruebas.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/06_Pruebas.md): Resultados de verificación de build y plan de pruebas automatizadas.
 - [`07_Incidencias.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/07_Incidencias.md): Registro de diagnóstico, causas y soluciones de incidencias.
 - [`RESUMEN_NOTEBOOKLM_PSAGENTS.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/05_AgentesIA/RESUMEN_NOTEBOOKLM_PSAGENTS.md): Resumen técnico de la arquitectura PsAgents optimizado para NotebookLM.
