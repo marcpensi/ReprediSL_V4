@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -341,9 +341,93 @@ namespace ReprediTrayDaemon.Services
             }
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // PASO 0: Actualizar Base de Datos Access antes de arrancar
+        // ─────────────────────────────────────────────────────────────
+        public async Task<bool> ActualizarBaseDatosAccessAsync()
+        {
+            string ps1 = Path.Combine(ProjectRoot, "Scripts", "Migracion", "MigrarYActualizarAccess.ps1");
+            if (!File.Exists(ps1))
+            {
+                OnProcessOutput?.Invoke(ServiceId.AccessErp,
+                    $"[ERROR] No se encuentra el script de actualización: {ps1}", true);
+                return false;
+            }
+
+            OnProcessOutput?.Invoke(ServiceId.AccessErp,
+                "⚙️  [BD Access] Iniciando actualización automática de la base de datos...", false);
+            UpdateServiceState(ServiceId.AccessErp, ServiceStatusState.Iniciando, "Actualizando BD...");
+
+            try
+            {
+                var psi = new ProcessStartInfo("powershell.exe",
+                    $"-NoProfile -ExecutionPolicy Bypass -File \"{ps1}\"")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8,
+                    WorkingDirectory = ProjectRoot
+                };
+
+                using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+                proc.Start();
+
+                // Leer stdout y stderr asíncronamente para evitar deadlocks y CA2024
+                var stdoutTask = Task.Run(async () =>
+                {
+                    string? line;
+                    while ((line = await proc.StandardOutput.ReadLineAsync()) != null)
+                        OnProcessOutput?.Invoke(ServiceId.AccessErp, "  " + line, false);
+                });
+                var stderrTask = Task.Run(async () =>
+                {
+                    string? line;
+                    while ((line = await proc.StandardError.ReadLineAsync()) != null)
+                        OnProcessOutput?.Invoke(ServiceId.AccessErp, "  [ERR] " + line, true);
+                });
+
+                await Task.WhenAll(stdoutTask, stderrTask);
+                await proc.WaitForExitAsync();
+
+                if (proc.ExitCode == 0)
+                {
+                    OnProcessOutput?.Invoke(ServiceId.AccessErp,
+                        "✅  [BD Access] Base de datos actualizada correctamente.", false);
+                    UpdateServiceState(ServiceId.AccessErp, ServiceStatusState.Activo, "BD actualizada");
+                    return true;
+                }
+                else
+                {
+                    OnProcessOutput?.Invoke(ServiceId.AccessErp,
+                        $"⚠️  [BD Access] El script terminó con código {proc.ExitCode}. Revisa el log.", true);
+                    UpdateServiceState(ServiceId.AccessErp, ServiceStatusState.Error,
+                        $"Exit code {proc.ExitCode}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                OnProcessOutput?.Invoke(ServiceId.AccessErp,
+                    $"[ERROR] Excepción al actualizar BD Access: {ex.Message}", true);
+                UpdateServiceState(ServiceId.AccessErp, ServiceStatusState.Error, ex.Message);
+                return false;
+            }
+        }
+
         public async Task StartAllServicesAsync()
         {
             OnProcessOutput?.Invoke(ServiceId.Postgres, "--- INICIANDO TODOS LOS SERVICIOS DE REPREDISL V4 ---", false);
+
+            // PASO 0: Actualizar la base de datos Access antes de arrancar servicios
+            bool bdOk = await ActualizarBaseDatosAccessAsync();
+            if (!bdOk)
+            {
+                OnProcessOutput?.Invoke(ServiceId.Postgres,
+                    "⚠️  La actualización de BD no completó sin errores. Los servicios se arrancarán de todas formas.", true);
+            }
 
             // 1. Check PostgreSQL
             bool pgOk = await CheckPostgresAsync();
