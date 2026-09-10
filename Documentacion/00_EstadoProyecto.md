@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
 **Fecha de actualización:** 10-09-2026  
-**Versión:** 4.4.0  
-**Estado General:** Estable y Operativo (Consolidación V4.4.0 - Integración Completa PWA a Access ERP en Producción C:\pensi\psgestw, Soporte de Series Comerciales Reales y Lanzadores Maestros del Ecosistema)
+**Versión:** 4.5.0  
+**Estado General:** Estable y Operativo (Consolidación V4.5.0 - Centro de Control Unificado de Procesos y Servicios en ReprediTrayDaemon, Monitorización en Tiempo Real de PostgreSQL, PostgREST, Caddy y Sincronizador ERP, Eliminación de Ventanas CMD Dispersas)
 
 ---
 
@@ -28,6 +28,7 @@
 - [x] **Configuración Base ERP Producción PsGest (`C:\pensi\psgestw\e0012026\gestion.mdb`):** Conexión prioritaria configurada en `DbSyncService.cs`, `SincronizarPedidosEntrantes.ps1` y scripts de exportación para insertar directamente en la base de datos real del ERP de la empresa.
 - [x] **Identificación de Serie Comercial Real (`VD`):** Corrección del prefijo en la numeración para reflejar la serie del vendedor (`VD-2988` en vez de `P-2988`), capturando el importe real y asociando correctamente `Serie` y `NumPedido` en las tablas `PedidosCab` y `PedidosLin`.
 - [x] **Script de Migración .MDB Externo:** Automatización completa que clona `dborigen.mdb` -> `bddestino.mdb`, actualiza esquemas/consultas DAO e inyecta el código VBA sin intervención manual.
+- [x] **Centro de Control Unificado de Procesos y Servicios (V4.5.0):** Centralización del arranque, parada y monitorización en vivo de todos los procesos del sistema (PostgreSQL 16, PostgREST API, Caddy Reverse Proxy, Sincronizador de Pedidos y Access ERP) en un único módulo visual (`ReprediTrayDaemon`). Incluye botonera maestra («Arrancar Todo», «Detener Todo», «Reiniciar»), tiles con estado en vivo (🟢/🔴/🟡) y control individual, integración con `ARRANCAR_TODO.bat` mediante `--start-all` (sin consolas CMD sueltas), salida unificada de logs en consola y acceso rápido en la bandeja del sistema.
 
 ---
 

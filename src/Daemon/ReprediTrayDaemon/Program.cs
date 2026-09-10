@@ -9,7 +9,7 @@ namespace ReprediTrayDaemon
         private static Mutex? mutex = null;
 
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
             const string appName = @"Local\ReprediSL_V4_Daemon_Mutex";
             bool createdNew;
@@ -19,7 +19,7 @@ namespace ReprediTrayDaemon
             if (!createdNew)
             {
                 MessageBox.Show(
-                    "El Demonio de Sincronizacion ya se encuentra en ejecucion en la barra de tareas (junto al reloj).",
+                    "El Centro de Control de ReprediSL V4 ya se encuentra en ejecución en la barra de tareas (junto al reloj). Haz doble clic en el icono para abrirlo.",
                     "ReprediSL V4",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
@@ -29,7 +29,21 @@ namespace ReprediTrayDaemon
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+
+            bool autoStart = false;
+            if (args != null)
+            {
+                foreach (var arg in args)
+                {
+                    if (arg.Equals("--start-all", StringComparison.OrdinalIgnoreCase) ||
+                        arg.Equals("-start", StringComparison.OrdinalIgnoreCase))
+                    {
+                        autoStart = true;
+                    }
+                }
+            }
+
+            Application.Run(new MainForm(autoStart));
 
             GC.KeepAlive(mutex);
         }

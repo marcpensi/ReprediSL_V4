@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -18,12 +19,43 @@ namespace ReprediTrayDaemon
         // Contenedores Principales
         private FlowLayoutPanel pnlMainContent = null!;
         private Panel pnlHeader = null!;
+        private Panel pnlServicesCard = null!;
         private Panel pnlModeSwitch = null!;
         private Panel pnlPipelineDiagram = null!;
         private TableLayoutPanel pnlMetricCards = null!;
         private FlowLayoutPanel flowSubMetrics = null!;
         private Panel pnlLogConsoleCard = null!;
         private Panel pnlStatusBar = null!;
+
+        // Centro de Control de Servicios
+        private Label lblServicesTitle = null!;
+        private Button btnStartAllServices = null!;
+        private Button btnStopAllServices = null!;
+        private Button btnRestartAllServices = null!;
+
+        // Tarjetas individuales de servicios
+        private Panel cardSvcPg = null!;
+        private Panel cardSvcPostgrest = null!;
+        private Panel cardSvcCaddy = null!;
+        private Panel cardSvcSync = null!;
+        private Panel cardSvcAccess = null!;
+
+        private Label lblSvcPgStatus = null!;
+        private Label lblSvcPostgrestStatus = null!;
+        private Label lblSvcCaddyStatus = null!;
+        private Label lblSvcSyncStatus = null!;
+        private Label lblSvcAccessStatus = null!;
+
+        private Button? btnTogglePostgrest = null;
+        private Button? btnToggleCaddy = null;
+        private Button? btnToggleSync = null;
+
+        // Items dinámicos del menú de bandeja
+        private ToolStripMenuItem itemTrayPg = null!;
+        private ToolStripMenuItem itemTrayPostgrest = null!;
+        private ToolStripMenuItem itemTrayCaddy = null!;
+        private ToolStripMenuItem itemTraySync = null!;
+        private ToolStripMenuItem itemTrayAccess = null!;
 
         // MODO Pill Switch
         private Label lblModeTag = null!;
@@ -64,10 +96,12 @@ namespace ReprediTrayDaemon
 
         // Servicios y Configuración
         private DbSyncService syncService = null!;
+        private ProcessManagerService processManager = null!;
         private System.Windows.Forms.Timer timerHealth = null!;
         private DateTime startTime = DateTime.Now;
         private bool forceClose = false;
         private int totalRegistrosProcesadosHoy = 11;
+        private int healthCheckCycle = 0;
 
         private bool autoAcceptMode = true; // Por defecto Auto-Aceptar
         private int pedidosPendientesCount = 0;
@@ -120,32 +154,47 @@ namespace ReprediTrayDaemon
             return AppDomain.CurrentDomain.BaseDirectory;
         }
 
-        public MainForm()
+        public MainForm(bool autoStartAll = false)
         {
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
 
             string projectRoot = ResolveProjectRoot();
-
             settingsFilePath = Path.Combine(projectRoot, "src", "Access", "ui_settings.json");
 
-            InitializeComponentCustom();
+            processManager = new ProcessManagerService(projectRoot);
+            processManager.OnServiceStatusChanged += ProcessManager_OnServiceStatusChanged;
+            processManager.OnProcessOutput += ProcessManager_OnProcessOutput;
 
             syncService = new DbSyncService(projectRoot);
             syncService.OnLogMessage += SyncService_OnLogMessage;
             syncService.OnErrorThresholdExceeded += SyncService_OnErrorThresholdExceeded;
 
+            InitializeComponentCustom();
+
             CargarConfiguracionUI();
             ApplyTheme(currentTheme);
             UpdateStatusLabels();
 
-            syncService.AppendLog("SELECT id, cliente, total FROM pedidos_nuevos WHERE estado='N' AND synced_at IS NULL -> 1 fila (P-2491)", DbSyncService.LogLevel.Info);
-            syncService.AppendLog("INSERT INTO PedidosCab (NumPedido, Cliente, Total, Canal) VALUES ('P-2491', ..., 810.41, 'movil')", DbSyncService.LogLevel.Success);
+            syncService.AppendLog("Centro de Control ReprediSL V4 iniciado correctamente.", DbSyncService.LogLevel.Info);
+            syncService.AppendLog("Base de datos destino: repredisl_api (PostgreSQL 16) ⇄ gestion.mdb", DbSyncService.LogLevel.Info);
 
             timerHealth = new System.Windows.Forms.Timer { Interval = 1000 };
             timerHealth.Tick += TimerHealth_Tick;
             timerHealth.Start();
+
+            // Chequeo inicial de estado
+            _ = processManager.CheckAllHealthAsync();
+
+            if (autoStartAll)
+            {
+                this.Shown += async (s, e) =>
+                {
+                    await Task.Delay(600);
+                    await processManager.StartAllServicesAsync();
+                };
+            }
         }
 
         protected override void OnPaintBackground(PaintEventArgs e)
@@ -163,9 +212,9 @@ namespace ReprediTrayDaemon
 
         private void InitializeComponentCustom()
         {
-            this.Text = "PsSyncBridge Tray - ReprediSL V4";
-            this.MinimumSize = new Size(980, 750);
-            this.Size = new Size(1100, 840);
+            this.Text = "ReprediSL V4 · Centro de Control y Servicios";
+            this.MinimumSize = new Size(1000, 780);
+            this.Size = new Size(1140, 920);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Icon = SystemIcons.Application;
 
@@ -193,7 +242,7 @@ namespace ReprediTrayDaemon
 
             var picDbIcon = new Label
             {
-                Text = "🔄",
+                Text = "⚡",
                 Font = new Font("Segoe UI Emoji", 20F, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(4, 6)
@@ -201,7 +250,7 @@ namespace ReprediTrayDaemon
 
             lblHeaderTitle = new Label
             {
-                Text = "PsSyncBridge Tray",
+                Text = "ReprediSL V4 · Centro de Control",
                 Font = new Font("Segoe UI", 15F, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(54, 4),
@@ -211,7 +260,7 @@ namespace ReprediTrayDaemon
 
             lblHeaderSubtitle = new Label
             {
-                Text = "PostgreSQL 16 · ventas_produccion ⇄ ODBC · gestion.mdb",
+                Text = "PostgreSQL 16 · repredisl_api ⇄ ODBC · gestion.mdb (Puerto 3000 / SSL 443)",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(54, 30),
@@ -229,7 +278,12 @@ namespace ReprediTrayDaemon
             pnlHeader.Controls.Add(pnlOnlineBadge);
 
             // ==========================================
-            // 2. CONMUTADOR DE MODO (MODO Segmented Pill Switch)
+            // 2. CENTRO DE CONTROL · GESTIÓN DE SERVICIOS (Nuevo)
+            // ==========================================
+            pnlServicesCard = CreateServicesControlCard();
+
+            // ==========================================
+            // 3. CONMUTADOR DE MODO (MODO Segmented Pill Switch)
             // ==========================================
             pnlModeSwitch = CreateRoundedGlassCard(1040, 58, 20);
             pnlModeSwitch.Margin = new Padding(0, 0, 0, 16);
@@ -313,7 +367,7 @@ namespace ReprediTrayDaemon
             pnlModeSwitch.Controls.Add(btnVerPedidos);
 
             // ==========================================
-            // 3. DIAGRAMA DE FLUJO DE PIPELINE (3 Nodos Conectados)
+            // 4. DIAGRAMA DE FLUJO DE PIPELINE (3 Nodos Conectados)
             // ==========================================
             pnlPipelineDiagram = new Panel
             {
@@ -322,12 +376,12 @@ namespace ReprediTrayDaemon
                 BackColor = Color.Transparent
             };
 
-            cardNodePg = CreatePipelineNodeCard("🗄️", "PostgreSQL", "pedidos_nuevos",
+            cardNodePg = CreatePipelineNodeCard("🗄️", "PostgreSQL", "repredisl_api",
                 () => (DateTime.Now - pgLastActive).TotalSeconds < 3,
                 out lblNodePgStatus, out iconNodePg);
             cardNodePg.Location = new Point(0, 0);
 
-            cardNodeBridge = CreatePipelineNodeCard("🔄", "PsSyncBridge", "idle",
+            cardNodeBridge = CreatePipelineNodeCard("🔄", "API & Sincronizador", "idle",
                 () => (DateTime.Now - bridgeLastActive).TotalSeconds < 3,
                 out lblNodeBridgeStatus, out iconNodeBridge);
             cardNodeBridge.Location = new Point(380, 0);
@@ -355,7 +409,7 @@ namespace ReprediTrayDaemon
             pnlPipelineDiagram.Controls.Add(cardNodeAccess);
 
             // ==========================================
-            // 4. TARJETAS DE TELEMETRÍA (4 Grid Cards)
+            // 5. TARJETAS DE TELEMETRÍA (4 Grid Cards)
             // ==========================================
             pnlMetricCards = new TableLayoutPanel
             {
@@ -381,7 +435,7 @@ namespace ReprediTrayDaemon
             pnlMetricCards.Controls.Add(cardPending, 3, 0);
 
             // ==========================================
-            // 5. BARRA DE SUB-MÉTRICAS (Sub-Pill Badges)
+            // 6. BARRA DE SUB-MÉTRICAS (Sub-Pill Badges)
             // ==========================================
             flowSubMetrics = new FlowLayoutPanel
             {
@@ -392,16 +446,16 @@ namespace ReprediTrayDaemon
                 BackColor = Color.Transparent
             };
 
-            flowSubMetrics.Controls.Add(CreateSubPillBadge("latencia 68 ms"));
-            flowSubMetrics.Controls.Add(CreateSubPillBadge("reintentos 1"));
-            flowSubMetrics.Controls.Add(CreateSubPillBadge("errores red 1"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("latencia 12 ms"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("reintentos 0"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("errores red 0"));
             flowSubMetrics.Controls.Add(CreateSubPillBadge("cola retry 0"));
-            flowSubMetrics.Controls.Add(CreateSubPillBadge("poll 2 s"));
+            flowSubMetrics.Controls.Add(CreateSubPillBadge("poll loop 3 s"));
 
             // ==========================================
-            // 6. CONSOLA EN TIEMPO REAL ("CONSOLA · TIEMPO REAL")
+            // 7. CONSOLA EN TIEMPO REAL ("CONSOLA · TIEMPO REAL")
             // ==========================================
-            pnlLogConsoleCard = CreateRoundedGlassCard(1040, 330, 20);
+            pnlLogConsoleCard = CreateRoundedGlassCard(1040, 310, 20);
             pnlLogConsoleCard.Margin = new Padding(0, 0, 0, 16);
 
             var pnlLogHeader = new Panel
@@ -413,7 +467,7 @@ namespace ReprediTrayDaemon
 
             lblConsoleTitle = new Label
             {
-                Text = "CONSOLA · TIEMPO REAL",
+                Text = "CONSOLA · TIEMPO REAL (PostgREST · Caddy · Sync · ERP)",
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 AutoSize = true,
@@ -466,7 +520,7 @@ namespace ReprediTrayDaemon
             {
                 Dock = DockStyle.Top,
                 Height = 24,
-                Text = " ● tail -f src\\Access\\sync_progress.log    · 1263 KB    · offset 1.293.779    · 9 l/min",
+                Text = " ● Registro unificado de servicios y sincronización activa",
                 Font = new Font("Consolas", 8.5F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Padding = new Padding(12, 0, 0, 0)
@@ -488,7 +542,7 @@ namespace ReprediTrayDaemon
             pnlLogConsoleCard.Controls.Add(pnlLogHeader);
 
             // ==========================================
-            // 7. BARRA DE ESTADO INFERIOR (Footer Status Bar)
+            // 8. BARRA DE ESTADO INFERIOR (Footer Status Bar)
             // ==========================================
             pnlStatusBar = new Panel
             {
@@ -499,7 +553,7 @@ namespace ReprediTrayDaemon
 
             lblFooterServiceInfo = new Label
             {
-                Text = "PsSyncBridge v2.4.1 · build 8841 · servicio «PsSyncBridgeSvc»",
+                Text = "ReprediSL V4 · Centro de Control Unificado · API https://api.repredisl.com",
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 AutoSize = true,
@@ -521,6 +575,7 @@ namespace ReprediTrayDaemon
 
             // Agregar contenedores al layout principal
             pnlMainContent.Controls.Add(pnlHeader);
+            pnlMainContent.Controls.Add(pnlServicesCard);
             pnlMainContent.Controls.Add(pnlModeSwitch);
             pnlMainContent.Controls.Add(pnlPipelineDiagram);
             pnlMainContent.Controls.Add(pnlMetricCards);
@@ -530,39 +585,43 @@ namespace ReprediTrayDaemon
 
             this.Controls.Add(pnlMainContent);
 
-            // Menu contextual del System Tray
+            // ==========================================
+            // MENU CONTEXTUAL DEL SYSTEM TRAY
+            // ==========================================
             trayMenu = new ContextMenuStrip { Font = new Font("Segoe UI Emoji", 10F), ShowImageMargin = false, ShowCheckMargin = false };
 
-            var itemHeader = new ToolStripMenuItem("🗄️ ReprediSL V4 (Demonio en ejecución)") { Enabled = false, Font = new Font("Segoe UI Emoji", 10F, FontStyle.Bold) };
+            var itemHeader = new ToolStripMenuItem("⚡ ReprediSL V4 - Centro de Control") { Enabled = false, Font = new Font("Segoe UI Emoji", 10F, FontStyle.Bold) };
             trayMenu.Items.Add(itemHeader);
             trayMenu.Items.Add("-");
 
-            trayMenu.Items.Add("📄 Ver Registro / Log en Vivo", null, (s, e) => ShowForm());
-            trayMenu.Items.Add("📋 Ver Pedidos", null, (s, e) => MostrarVentanaPedidos());
-            trayMenu.Items.Add("▶️ Ejecutar Sincronización Ahora", null, async (s, e) => await DoManualSyncAsync());
-            trayMenu.Items.Add("📦 Gestionar / Aceptar Pedidos Pendientes", null, (s, e) => ConfirmarPedidosPendientesManual());
+            // Estado de Servicios
+            itemTrayPg = new ToolStripMenuItem("🐘 PostgreSQL: Comprobando...") { Enabled = false };
+            itemTrayPostgrest = new ToolStripMenuItem("⚡ PostgREST: Comprobando...") { Enabled = false };
+            itemTrayCaddy = new ToolStripMenuItem("🌐 Caddy SSL: Comprobando...") { Enabled = false };
+            itemTraySync = new ToolStripMenuItem("🔄 Sincronizador: Comprobando...") { Enabled = false };
+            itemTrayAccess = new ToolStripMenuItem("📄 Access ERP: Comprobando...") { Enabled = false };
+
+            trayMenu.Items.Add(itemTrayPg);
+            trayMenu.Items.Add(itemTrayPostgrest);
+            trayMenu.Items.Add(itemTrayCaddy);
+            trayMenu.Items.Add(itemTraySync);
+            trayMenu.Items.Add(itemTrayAccess);
+            trayMenu.Items.Add("-");
+
+            trayMenu.Items.Add("▶️ Arrancar Todos los Servicios", null, async (s, e) => await processManager.StartAllServicesAsync());
+            trayMenu.Items.Add("⏹️ Detener Todos los Servicios", null, async (s, e) => await processManager.StopAllServicesAsync());
+            trayMenu.Items.Add("🔄 Reiniciar Todos los Servicios", null, async (s, e) => await processManager.RestartAllServicesAsync());
+            trayMenu.Items.Add("-");
+
+            trayMenu.Items.Add("🖥️ Abrir Centro de Control", null, (s, e) => ShowForm());
+            trayMenu.Items.Add("📋 Ver Pedidos Registrados", null, (s, e) => MostrarVentanaPedidos());
+            trayMenu.Items.Add("▶️ Ejecutar Exportación Access Manual", null, async (s, e) => await DoManualSyncAsync());
             trayMenu.Items.Add("⚙️ Alternar Modo Auto-Aceptar", null, (s, e) => ToggleAutoAcceptMode());
 
             trayMenu.Items.Add("-");
-            trayMenu.Items.Add("🚨 Ver Log Especial de Errores (sync_errors.log)", null, (s, e) => MostrarVentanaErrores());
-            trayMenu.Items.Add("💾 Exportar Registro (Guardar como...)", null, (s, e) => ExportarRegistro());
-            trayMenu.Items.Add("🖨️ Imprimir Registro", null, (s, e) => ImprimirRegistro());
-            trayMenu.Items.Add("🗑️ Limpiar Registro (Con Copia de Seg.)", null, (s, e) => LimpiarRegistroConConfirmacion());
-
-            trayMenu.Items.Add("-");
-            var itemSubFuente = new ToolStripMenuItem("🔤 Tamaño de Letra & Tema");
-            itemSubFuente.DropDownItems.Add("Pequeño", null, (s, e) => syncService.AppendLog("[CONFIG] Tamaño de letra ajustado a Pequeño", DbSyncService.LogLevel.Info));
-            itemSubFuente.DropDownItems.Add("Mediano", null, (s, e) => syncService.AppendLog("[CONFIG] Tamaño de letra ajustado a Mediano", DbSyncService.LogLevel.Info));
-            itemSubFuente.DropDownItems.Add("Grande", null, (s, e) => syncService.AppendLog("[CONFIG] Tamaño de letra ajustado a Grande", DbSyncService.LogLevel.Info));
-            itemSubFuente.DropDownItems.Add("-");
-            itemSubFuente.DropDownItems.Add("🎨 Cambiar Tema (Claro / Oscuro)", null, (s, e) => ToggleTheme());
-            trayMenu.Items.Add(itemSubFuente);
-
-            var itemSubPruebas = new ToolStripMenuItem("🧪 Pruebas y Simulaciones");
-            itemSubPruebas.DropDownItems.Add("🟣 ▶️ Simular Llegada de Pedido (Prueba)", null, (s, e) => ProcesarLlegadaPedido());
-            itemSubPruebas.DropDownItems.Add("🔴 ⚠️ Simular Error de Sync (Prueba Alerta Rojo)", null, (s, e) => SimularErrorSync());
-            itemSubPruebas.DropDownItems.Add("⚡ Simular Ráfaga de Errores (Prueba Incremento Rápido)", null, (s, e) => SimularRafagaErrores());
-            trayMenu.Items.Add(itemSubPruebas);
+            trayMenu.Items.Add("🚨 Ver Log de Errores (sync_errors.log)", null, (s, e) => MostrarVentanaErrores());
+            trayMenu.Items.Add("💾 Exportar Registro a Archivo", null, (s, e) => ExportarRegistro());
+            trayMenu.Items.Add("🎨 Cambiar Tema (Claro / Oscuro)", null, (s, e) => ToggleTheme());
 
             trayMenu.Items.Add("-");
             trayMenu.Items.Add("🚪 Salir del Demonio", null, (s, e) => { forceClose = true; Application.Exit(); });
@@ -571,10 +630,384 @@ namespace ReprediTrayDaemon
             {
                 Icon = SystemIcons.Application,
                 ContextMenuStrip = trayMenu,
-                Text = "PsSyncBridge Tray - ReprediSL V4",
+                Text = "ReprediSL V4 - Centro de Control",
                 Visible = true
             };
             trayIcon.DoubleClick += (s, e) => ShowForm();
+        }
+
+        private Panel CreateServicesControlCard()
+        {
+            var pnl = CreateRoundedGlassCard(1040, 160, 20);
+            pnl.Margin = new Padding(0, 0, 0, 16);
+
+            var topBar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 44,
+                BackColor = Color.Transparent,
+                Padding = new Padding(16, 6, 16, 6)
+            };
+
+            lblServicesTitle = new Label
+            {
+                Text = "⚡ ESTADO Y CONTROL DE PROCESOS",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(249, 250, 251) : Color.FromArgb(30, 41, 59),
+                AutoSize = true,
+                Location = new Point(14, 12)
+            };
+
+            btnStartAllServices = new Button
+            {
+                Text = "▶️ Arrancar Todo",
+                Size = new Size(135, 30),
+                Location = new Point(610, 6),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                BackColor = Color.FromArgb(16, 185, 129),
+                ForeColor = Color.White
+            };
+            btnStartAllServices.FlatAppearance.BorderSize = 0;
+            using var r1 = GetRoundedRectPath(new Rectangle(0, 0, 135, 30), 12);
+            btnStartAllServices.Region = new Region(r1);
+            btnStartAllServices.Click += async (s, e) =>
+            {
+                btnStartAllServices.Enabled = false;
+                await processManager.StartAllServicesAsync();
+                btnStartAllServices.Enabled = true;
+            };
+
+            btnStopAllServices = new Button
+            {
+                Text = "⏹️ Detener Todo",
+                Size = new Size(135, 30),
+                Location = new Point(755, 6),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                BackColor = Color.FromArgb(239, 68, 68),
+                ForeColor = Color.White
+            };
+            btnStopAllServices.FlatAppearance.BorderSize = 0;
+            using var r2 = GetRoundedRectPath(new Rectangle(0, 0, 135, 30), 12);
+            btnStopAllServices.Region = new Region(r2);
+            btnStopAllServices.Click += async (s, e) =>
+            {
+                btnStopAllServices.Enabled = false;
+                await processManager.StopAllServicesAsync();
+                btnStopAllServices.Enabled = true;
+            };
+
+            btnRestartAllServices = new Button
+            {
+                Text = "🔄 Reiniciar",
+                Size = new Size(115, 30),
+                Location = new Point(900, 6),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                BackColor = Color.FromArgb(59, 130, 246),
+                ForeColor = Color.White
+            };
+            btnRestartAllServices.FlatAppearance.BorderSize = 0;
+            using var r3 = GetRoundedRectPath(new Rectangle(0, 0, 115, 30), 12);
+            btnRestartAllServices.Region = new Region(r3);
+            btnRestartAllServices.Click += async (s, e) =>
+            {
+                btnRestartAllServices.Enabled = false;
+                await processManager.RestartAllServicesAsync();
+                btnRestartAllServices.Enabled = true;
+            };
+
+            topBar.Controls.Add(lblServicesTitle);
+            topBar.Controls.Add(btnStartAllServices);
+            topBar.Controls.Add(btnStopAllServices);
+            topBar.Controls.Add(btnRestartAllServices);
+
+            // Contenedor horizontal de las 5 tarjetas de servicios
+            var flowServices = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Padding = new Padding(12, 4, 12, 8),
+                BackColor = Color.Transparent
+            };
+
+            cardSvcPg = CreateSingleServiceTile("🐘", "PostgreSQL", ":5432 · repredisl_api", out lblSvcPgStatus, out _, null);
+            cardSvcPostgrest = CreateSingleServiceTile("⚡", "PostgREST API", ":3000 · REST", out lblSvcPostgrestStatus, out btnTogglePostgrest,
+                async () =>
+                {
+                    if (processManager.GetStatus(ServiceId.Postgrest).State == ServiceStatusState.Activo)
+                        await processManager.StopPostgrestAsync();
+                    else
+                        await processManager.StartPostgrestAsync();
+                });
+            cardSvcCaddy = CreateSingleServiceTile("🌐", "Caddy Proxy", ":443 · SSL HTTPS", out lblSvcCaddyStatus, out btnToggleCaddy,
+                async () =>
+                {
+                    if (processManager.GetStatus(ServiceId.Caddy).State == ServiceStatusState.Activo)
+                        await processManager.StopCaddyAsync();
+                    else
+                        await processManager.StartCaddyAsync();
+                });
+            cardSvcSync = CreateSingleServiceTile("🔄", "Sync Pedidos", "Postgres → Access", out lblSvcSyncStatus, out btnToggleSync,
+                async () =>
+                {
+                    if (processManager.GetStatus(ServiceId.SyncPedidos).State == ServiceStatusState.Activo)
+                        await processManager.StopSyncPedidosAsync();
+                    else
+                        await processManager.StartSyncPedidosAsync();
+                });
+            cardSvcAccess = CreateSingleServiceTile("📄", "Access ERP", "gestion.mdb", out lblSvcAccessStatus, out _, null);
+
+            flowServices.Controls.Add(cardSvcPg);
+            flowServices.Controls.Add(cardSvcPostgrest);
+            flowServices.Controls.Add(cardSvcCaddy);
+            flowServices.Controls.Add(cardSvcSync);
+            flowServices.Controls.Add(cardSvcAccess);
+
+            pnl.Controls.Add(flowServices);
+            pnl.Controls.Add(topBar);
+
+            return pnl;
+        }
+
+        private Panel CreateSingleServiceTile(string emoji, string title, string subtitle,
+            out Label statusLbl, out Button? toggleBtn, Func<Task>? onToggle)
+        {
+            var tile = new Panel
+            {
+                Size = new Size(195, 96),
+                Margin = new Padding(0, 0, 8, 0),
+                BackColor = Color.Transparent
+            };
+            using var reg = GetRoundedRectPath(new Rectangle(0, 0, 195, 96), 14);
+            tile.Region = new Region(reg);
+
+            tile.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, tile.Width - 1, tile.Height - 1), 14);
+                Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(25, 34, 54) : Color.FromArgb(241, 245, 249);
+                Color borderClr = currentTheme == "Oscuro" ? Color.FromArgb(45, 58, 82) : Color.FromArgb(203, 213, 225);
+                using var brush = new SolidBrush(fillClr);
+                using var pen = new Pen(borderClr, 1.2f);
+                e.Graphics.FillPath(brush, path);
+                e.Graphics.DrawPath(pen, path);
+            };
+
+            var lblIcon = new Label
+            {
+                Text = emoji,
+                Font = new Font("Segoe UI Emoji", 14F),
+                Location = new Point(8, 8),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+
+            var lblTitle = new Label
+            {
+                Text = title,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(38, 8),
+                Size = new Size(150, 18),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42),
+                BackColor = Color.Transparent
+            };
+
+            var lblSub = new Label
+            {
+                Text = subtitle,
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
+                Location = new Point(38, 26),
+                Size = new Size(150, 16),
+                ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139),
+                BackColor = Color.Transparent
+            };
+
+            statusLbl = new Label
+            {
+                Text = "Comprobando...",
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Location = new Point(8, 56),
+                Size = new Size(onToggle != null ? 112 : 178, 28),
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.FromArgb(245, 158, 11),
+                BackColor = Color.Transparent
+            };
+
+            tile.Controls.Add(lblIcon);
+            tile.Controls.Add(lblTitle);
+            tile.Controls.Add(lblSub);
+            tile.Controls.Add(statusLbl);
+
+            if (onToggle != null)
+            {
+                var btn = new Button
+                {
+                    Text = "▶️",
+                    Font = new Font("Segoe UI Emoji", 8F, FontStyle.Bold),
+                    Location = new Point(126, 56),
+                    Size = new Size(60, 28),
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand,
+                    BackColor = Color.FromArgb(16, 185, 129),
+                    ForeColor = Color.White
+                };
+                btn.FlatAppearance.BorderSize = 0;
+                using var pathBtn = GetRoundedRectPath(new Rectangle(0, 0, 60, 28), 8);
+                btn.Region = new Region(pathBtn);
+
+                btn.Click += async (s, e) =>
+                {
+                    btn.Enabled = false;
+                    try
+                    {
+                        await onToggle();
+                    }
+                    catch { }
+                    btn.Enabled = true;
+                };
+
+                toggleBtn = btn;
+                tile.Controls.Add(btn);
+            }
+            else
+            {
+                toggleBtn = null;
+            }
+
+            return tile;
+        }
+
+        private void ProcessManager_OnServiceStatusChanged(ServiceId id, ServiceStatusModel model)
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => ProcessManager_OnServiceStatusChanged(id, model)));
+                return;
+            }
+
+            UpdateServiceTileUi(id, model);
+            UpdateTrayStatusItems();
+
+            // Sincronizar nodos del diagrama de pipeline con el estado real
+            if (id == ServiceId.Postgres)
+            {
+                lblNodePgStatus.Text = model.State == ServiceStatusState.Activo ? "🟢 Activo (:5432)" : "🔴 Desconectado";
+                if (model.State == ServiceStatusState.Activo) pgLastActive = DateTime.Now;
+            }
+            else if (id == ServiceId.Postgrest || id == ServiceId.SyncPedidos)
+            {
+                var pgStat = processManager.GetStatus(ServiceId.Postgrest);
+                var syncStat = processManager.GetStatus(ServiceId.SyncPedidos);
+                bool bothActive = pgStat.State == ServiceStatusState.Activo && syncStat.State == ServiceStatusState.Activo;
+                lblNodeBridgeStatus.Text = bothActive ? "🟢 API & Sync OK" : "⚠️ Servicio caído";
+                if (bothActive) bridgeLastActive = DateTime.Now;
+            }
+            else if (id == ServiceId.AccessErp)
+            {
+                lblNodeAccessStatus.Text = model.State == ServiceStatusState.Activo ? "🟢 gestion.mdb OK" : "🔴 Inaccesible";
+                if (model.State == ServiceStatusState.Activo) accessLastActive = DateTime.Now;
+            }
+        }
+
+        private void UpdateServiceTileUi(ServiceId id, ServiceStatusModel model)
+        {
+            Label? targetLbl = id switch
+            {
+                ServiceId.Postgres => lblSvcPgStatus,
+                ServiceId.Postgrest => lblSvcPostgrestStatus,
+                ServiceId.Caddy => lblSvcCaddyStatus,
+                ServiceId.SyncPedidos => lblSvcSyncStatus,
+                ServiceId.AccessErp => lblSvcAccessStatus,
+                _ => null
+            };
+
+            Button? targetBtn = id switch
+            {
+                ServiceId.Postgrest => btnTogglePostgrest,
+                ServiceId.Caddy => btnToggleCaddy,
+                ServiceId.SyncPedidos => btnToggleSync,
+                _ => null
+            };
+
+            if (targetLbl != null)
+            {
+                switch (model.State)
+                {
+                    case ServiceStatusState.Activo:
+                        targetLbl.Text = "🟢 Activo";
+                        targetLbl.ForeColor = Color.FromArgb(34, 197, 94);
+                        if (targetBtn != null)
+                        {
+                            targetBtn.Text = "⏹️ Parar";
+                            targetBtn.BackColor = Color.FromArgb(239, 68, 68);
+                        }
+                        break;
+                    case ServiceStatusState.Iniciando:
+                        targetLbl.Text = "🟡 Iniciando...";
+                        targetLbl.ForeColor = Color.FromArgb(245, 158, 11);
+                        break;
+                    case ServiceStatusState.Detenido:
+                        targetLbl.Text = "🔴 Detenido";
+                        targetLbl.ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(248, 113, 113) : Color.FromArgb(220, 38, 38);
+                        if (targetBtn != null)
+                        {
+                            targetBtn.Text = "▶️ Iniciar";
+                            targetBtn.BackColor = Color.FromArgb(16, 185, 129);
+                        }
+                        break;
+                    case ServiceStatusState.Error:
+                        targetLbl.Text = "⚠️ Error";
+                        targetLbl.ForeColor = Color.FromArgb(239, 68, 68);
+                        if (targetBtn != null)
+                        {
+                            targetBtn.Text = "▶️ Iniciar";
+                            targetBtn.BackColor = Color.FromArgb(16, 185, 129);
+                        }
+                        break;
+                }
+            }
+        }
+
+        private void UpdateTrayStatusItems()
+        {
+            var pg = processManager.GetStatus(ServiceId.Postgres);
+            var postgrest = processManager.GetStatus(ServiceId.Postgrest);
+            var caddy = processManager.GetStatus(ServiceId.Caddy);
+            var sync = processManager.GetStatus(ServiceId.SyncPedidos);
+            var access = processManager.GetStatus(ServiceId.AccessErp);
+
+            if (itemTrayPg != null)
+                itemTrayPg.Text = $"🐘 PostgreSQL: {(pg.State == ServiceStatusState.Activo ? "🟢 Activo" : "🔴 Detenido")}";
+            if (itemTrayPostgrest != null)
+                itemTrayPostgrest.Text = $"⚡ PostgREST: {(postgrest.State == ServiceStatusState.Activo ? "🟢 Activo" : "🔴 Detenido")}";
+            if (itemTrayCaddy != null)
+                itemTrayCaddy.Text = $"🌐 Caddy SSL: {(caddy.State == ServiceStatusState.Activo ? "🟢 Activo" : "🔴 Detenido")}";
+            if (itemTraySync != null)
+                itemTraySync.Text = $"🔄 Sincronizador: {(sync.State == ServiceStatusState.Activo ? "🟢 Activo" : "🔴 Detenido")}";
+            if (itemTrayAccess != null)
+                itemTrayAccess.Text = $"📄 Access ERP: {(access.State == ServiceStatusState.Activo ? "🟢 Conectado" : "🔴 Inaccesible")}";
+        }
+
+        private void ProcessManager_OnProcessOutput(ServiceId id, string text, bool isError)
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => ProcessManager_OnProcessOutput(id, text, isError)));
+                return;
+            }
+
+            var level = isError ? DbSyncService.LogLevel.Error :
+                        (text.Contains("[OK]", StringComparison.OrdinalIgnoreCase) || text.Contains("éxito", StringComparison.OrdinalIgnoreCase) || text.Contains("exito", StringComparison.OrdinalIgnoreCase)
+                            ? DbSyncService.LogLevel.Success
+                            : DbSyncService.LogLevel.Info);
+
+            SyncService_OnLogMessage(text, level);
         }
 
         private Panel CreateRoundedGlassCard(int width, int height, int cornerRadius = 16)
@@ -852,11 +1285,11 @@ namespace ReprediTrayDaemon
                 totalRegistrosProcesadosHoy += confirmados;
                 pedidosPendientesCount = 0;
                 syncService.AppendLog($"[OK] {confirmados} pedido(s) confirmado(s) exitosamente por el usuario.", DbSyncService.LogLevel.Success);
-                MessageBox.Show($"¡Se han confirmado y procesado {confirmados} pedido(s) pendiente(s)!", "PsSyncBridge Tray - Confirmación", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"¡Se han confirmado y procesado {confirmados} pedido(s) pendiente(s)!", "ReprediSL V4 - Confirmación", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
-                MessageBox.Show("No hay pedidos pendientes de confirmación.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("No hay pedidos pendientes de confirmación.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             UpdateStatusLabels();
         }
@@ -973,6 +1406,10 @@ namespace ReprediTrayDaemon
             if (lblHeaderSubtitle != null)
                 lblHeaderSubtitle.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
 
+            // Services Card Header
+            if (lblServicesTitle != null)
+                lblServicesTitle.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(30, 41, 59);
+
             // Mode Switch
             if (lblModeTag != null)
                 lblModeTag.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
@@ -987,7 +1424,7 @@ namespace ReprediTrayDaemon
             iconNodeBridge?.Invalidate();
             iconNodeAccess?.Invalidate();
 
-            // Online badge - verde neón fosforito en modo oscuro
+            // Online badge
             if (pnlOnlineBadge != null)
             {
                 foreach (Control c in pnlOnlineBadge.Controls)
@@ -1103,6 +1540,13 @@ namespace ReprediTrayDaemon
                 lblUptimeVal.Text = $"{uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
             }
 
+            // Chequeo de estado de procesos cada 2 segundos
+            healthCheckCycle++;
+            if (healthCheckCycle % 2 == 0)
+            {
+                _ = processManager.CheckAllHealthAsync();
+            }
+
             // Parpadeo de iconos de nodos activos cada tick (~1s)
             blinkState = !blinkState;
             iconNodePg?.Invalidate();
@@ -1128,7 +1572,7 @@ namespace ReprediTrayDaemon
                 DbSyncService.LogLevel.Error => "ERROR",
                 DbSyncService.LogLevel.Warning => "WARN",
                 DbSyncService.LogLevel.Success => "SYNC",
-                _ => "SQL"
+                _ => "INFO"
             };
 
             // Activar indicadores visuales de nodos según actividad de log
@@ -1205,7 +1649,7 @@ namespace ReprediTrayDaemon
 
             if (level == DbSyncService.LogLevel.Error)
             {
-                try { trayIcon.ShowBalloonTip(3000, "PsSyncBridge - Error", message, ToolTipIcon.Error); } catch { }
+                try { trayIcon.ShowBalloonTip(3000, "ReprediSL V4 - Incidencia", message, ToolTipIcon.Error); } catch { }
             }
         }
 
@@ -1249,7 +1693,7 @@ namespace ReprediTrayDaemon
                 this.Hide();
                 try
                 {
-                    trayIcon.ShowBalloonTip(2000, "PsSyncBridge Tray", "El demonio continúa ejecutándose en segundo plano en la bandeja de sistema.", ToolTipIcon.Info);
+                    trayIcon.ShowBalloonTip(2000, "ReprediSL V4", "El Centro de Control continúa ejecutándose en segundo plano en la bandeja de sistema.", ToolTipIcon.Info);
                 }
                 catch { }
             }
@@ -1259,24 +1703,11 @@ namespace ReprediTrayDaemon
             }
         }
 
-        private void SimularErrorSync()
-        {
-            syncService.AppendLog("[ERROR] Fallo de prueba simulado: Conexión intermitente con PostgreSQL.", DbSyncService.LogLevel.Error);
-        }
-
-        private void SimularRafagaErrores()
-        {
-            for (int i = 1; i <= 4; i++)
-            {
-                syncService.AppendLog($"[ERROR] Ráfaga de incidencia #{i}: Simulación de fallo en lote {i * 500}", DbSyncService.LogLevel.Error);
-            }
-        }
-
         private void ExportarRegistro()
         {
             if (string.IsNullOrWhiteSpace(txtLog.Text))
             {
-                MessageBox.Show("El registro está vacío. No hay datos para exportar.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("El registro está vacío. No hay datos para exportar.", "ReprediSL V4", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -1301,65 +1732,6 @@ namespace ReprediTrayDaemon
             }
         }
 
-        private void ImprimirRegistro()
-        {
-            if (string.IsNullOrWhiteSpace(txtLog.Text))
-            {
-                MessageBox.Show("El registro está vacío. No hay datos para imprimir.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            try
-            {
-                using var pd = new System.Drawing.Printing.PrintDocument();
-                string textToPrint = txtLog.Text;
-                using var printFont = new Font("Consolas", 9F);
-
-                pd.PrintPage += (sender, ev) =>
-                {
-                    ev.Graphics?.DrawString(textToPrint, printFont, Brushes.Black, 40, 40);
-                    ev.HasMorePages = false;
-                };
-
-                using var printDialog = new PrintDialog { Document = pd };
-                if (printDialog.ShowDialog() == DialogResult.OK)
-                {
-                    pd.Print();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al imprimir: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void LimpiarRegistroConConfirmacion()
-        {
-            if (string.IsNullOrWhiteSpace(txtLog.Text))
-            {
-                MessageBox.Show("El registro ya está vacío.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var resp = MessageBox.Show(
-                "¿Deseas guardar una copia de seguridad del registro antes de limpiarlo?",
-                "Limpiar Registro - PsSyncBridge Tray",
-                MessageBoxButtons.YesNoCancel,
-                MessageBoxIcon.Question
-            );
-
-            if (resp == DialogResult.Cancel) return;
-
-            if (resp == DialogResult.Yes)
-            {
-                ExportarRegistro();
-            }
-
-            txtLog.Clear();
-            try { File.WriteAllText(syncService.ProgressLogPath, string.Empty); } catch { }
-            MessageBox.Show("El registro ha sido limpiado correctamente.", "PsSyncBridge Tray", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
         private void MostrarVentanaErrores()
         {
             Color dialogBg = currentTheme == "Claro" ? Color.FromArgb(254, 242, 242) : Color.FromArgb(24, 15, 20);
@@ -1368,7 +1740,7 @@ namespace ReprediTrayDaemon
 
             using var errForm = new Form
             {
-                Text = "PsSyncBridge Tray - Log Especial de Errores e Incidencias (sync_errors.log)",
+                Text = "ReprediSL V4 - Log Especial de Errores e Incidencias (sync_errors.log)",
                 StartPosition = FormStartPosition.CenterParent,
                 BackColor = dialogBg,
                 Size = new Size(1050, 650)
@@ -1466,7 +1838,7 @@ namespace ReprediTrayDaemon
 
             using var pedForm = new Form
             {
-                Text = "PsSyncBridge — Ver Pedidos",
+                Text = "ReprediSL V4 — Ver Pedidos",
                 StartPosition = FormStartPosition.CenterParent,
                 BackColor = dialogBg,
                 Size = new Size(920, 580),

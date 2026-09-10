@@ -61,13 +61,16 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 - **Objetivo:** Actualiza automáticamente el registro DNS tipo A de `api.repredisl.com` en Hostinger con la IP pública actual.
 
 ### 9. [`INICIAR_SISTEMA_COMPLETO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/INICIAR_SISTEMA_COMPLETO.bat) & [`ARRANCAR_TODO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/ARRANCAR_TODO.bat)
-- **Objetivo:** Script maestro que arranca de un solo clic los 4 servicios necesarios: PostgREST (API 3000), Caddy (HTTPS 443), Sincronizador de Pedidos a Access y el Demonio de Bandeja de Windows (`ReprediTrayDaemon.exe`).
+- **Objetivo:** Lanzador maestro de un solo clic que inicia el Centro de Control Unificado (`ReprediTrayDaemon.exe --start-all`), arrancando secuencial y silenciosamente en segundo plano PostgreSQL, PostgREST (API 3000), Caddy (HTTPS 443) y el Sincronizador de Pedidos a Access ERP sin abrir consolas CMD dispersas.
 
 ### 10. [`PARAR_SISTEMA_COMPLETO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/PARAR_SISTEMA_COMPLETO.bat) & [`PARAR_TODO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/PARAR_TODO.bat)
-- **Objetivo:** Script de parada limpia que detiene de golpe todos los servicios (PostgREST, Caddy, Sincronizador PowerShell y Demonio de Bandeja).
+- **Objetivo:** Script de parada limpia que detiene ordenadamente todos los procesos del ecosistema (Centro de Control, PostgREST, Caddy y Sincronizador de Pedidos).
 
 ### 11. [`SincronizarPedidosEntrantes.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/BaseDatos/SincronizarPedidosEntrantes.ps1) & [`ARRANCAR_SYNC_PEDIDOS.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ARRANCAR_SYNC_PEDIDOS.bat)
-- **Objetivo:** Proceso en segundo plano que consulta pedidos nuevos en PostgreSQL (`public.pedidos_nuevos`), notifica en tiempo real a `sync_progress.log` para disparar las alertas en `ReprediTrayDaemon.exe` e inserta automáticamente los registros en `PedidosCab` y `PedidosLin` de Microsoft Access (`gestion.mdb`).
+- **Objetivo:** Proceso en segundo plano que consulta pedidos nuevos en PostgreSQL (`public.pedidos_nuevos`), notifica en tiempo real a `sync_progress.log` para disparar las alertas en `ReprediTrayDaemon.exe` e inserta automáticamente los registros en `PedVentas`, `LineasPedVentas` e `IvaLineasPedVentas` de Microsoft Access (`gestion.mdb`).
 
 ### 12. [`CONFIGURAR_HOSTS_LOCAL.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/CONFIGURAR_HOSTS_LOCAL.bat)
 - **Objetivo:** Añade `127.0.0.1 api.repredisl.com` al archivo `hosts` de Windows (`C:\Windows\System32\drivers\etc\hosts`) ejecutado como Administrador, permitiendo que navegadores en el mismo equipo donde se ejecuta el servidor conecten directamente a la API HTTPS sin verse bloqueados por la falta de NAT Loopback en el router local.
+
+### 13. [`ENFORCE_UTF8_BOM.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ENFORCE_UTF8_BOM.ps1)
+- **Objetivo:** Utilidad de cumplimiento estricto de gobernanza de código que escanea todos los archivos `.cs` de `ReprediTrayDaemon` y re-guarda con codificación UTF-8 con BOM (Codepage 65001 con preámbulo `EF BB BF`) para evitar corrupción de caracteres en emojis y textos en español.
