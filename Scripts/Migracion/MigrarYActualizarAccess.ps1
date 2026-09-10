@@ -1,6 +1,6 @@
 param (
-    [string]$DbOrigen = "C:\pensi\psgestw\e0012026\gestion.mdb",
-    [string]$DbDestino = "src/Access/gestion.mdb",
+    [string]$DbOrigen  = "C:\pensi\psgestw\e0012026\gestion.mdb",
+    [string]$DbDestino = "C:\pensi\psgestw\e0012026\gestion.mdb",
     [string]$DbReferencia = "src/Access/BdNewRepre.mdb",
     [string]$ModuloBas = "src/Access/modActBdApi.bas"
 )
@@ -40,16 +40,19 @@ if (-not (Test-Path $pathOrigen)) {
 Get-Process -Name MSACCESS -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 300
 
-# 1. Copiar origen a destino
-Write-Host "[1/4] Copiando base origen (.MDB) a destino (.mdb)..." -ForegroundColor Yellow
-
+# 1. Copiar origen a destino (solo si son archivos distintos)
 $ldbPath = [System.IO.Path]::ChangeExtension($pathDestino, ".ldb")
 if (Test-Path $ldbPath) {
     try { Remove-Item -Path $ldbPath -Force -ErrorAction SilentlyContinue } catch {}
 }
 
-Copy-Item -Path $pathOrigen -Destination $pathDestino -Force
-Write-Host "      Base MDB copiada con exito en: $pathDestino" -ForegroundColor Green
+if ($pathOrigen -ne $pathDestino) {
+    Write-Host "[1/4] Copiando base origen a destino..." -ForegroundColor Yellow
+    Copy-Item -Path $pathOrigen -Destination $pathDestino -Force
+    Write-Host "      Base MDB copiada en: $pathDestino" -ForegroundColor Green
+} else {
+    Write-Host "[1/4] Origen y destino son el mismo archivo. Actualizando en su lugar: $pathDestino" -ForegroundColor Yellow
+}
 
 # 2. Iniciar Access COM Automation
 Write-Host "[2/4] Abriendo Access COM Automation (Formato .mdb)..." -ForegroundColor Yellow
