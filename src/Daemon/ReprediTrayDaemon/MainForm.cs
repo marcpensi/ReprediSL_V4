@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -1647,7 +1647,7 @@ namespace ReprediTrayDaemon
                 UpdateStatusLabels();
             }
 
-            if (level == DbSyncService.LogLevel.Error)
+            if (level == DbSyncService.LogLevel.Error && !syncService.SilenceAlerts && syncService.ErrorCount <= 4)
             {
                 try { trayIcon.ShowBalloonTip(3000, "ReprediSL V4 - Incidencia", message, ToolTipIcon.Error); } catch { }
             }
@@ -1663,7 +1663,8 @@ namespace ReprediTrayDaemon
 
             try
             {
-                trayIcon.ShowBalloonTip(5000, "⚠️ Alerta de Incidencias en Ráfaga", $"Se han acumulado {count} errores consecutivos en la sincronización con PostgreSQL.", ToolTipIcon.Warning);
+                trayIcon.ShowBalloonTip(5000, "⚠️ Alerta de Incidencias en Ráfaga", $"Se han acumulado {count} errores consecutivos. Se silencian nuevas alertas hasta que se restablezca la conexión.", ToolTipIcon.Warning);
+                syncService.SilenceAlerts = true;
             }
             catch { }
         }

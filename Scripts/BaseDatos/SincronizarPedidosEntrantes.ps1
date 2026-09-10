@@ -243,7 +243,17 @@ ORDER BY id ASC;
                 $rs.Close()
 
                 if ($yaExiste) {
-                    throw "El pedido $serie-$numPedido ya existe en PedVentas."
+                    $cn.RollbackTrans() | Out-Null
+                    Log-Sync "[INFO] El pedido $serie-$numPedido ya existe en PedVentas (Access). Marcando como sincronizado en PostgreSQL para evitar duplicados."
+                    $sqlUpdateYaExiste = @"
+UPDATE public.pedidos_nuevos
+SET estado = 'S', synced_at = NOW()
+WHERE id = $idPg AND estado = 'N';
+"@
+                    & psql -X -v ON_ERROR_STOP=1 -U postgres -d repredisl_api `
+                        -c $sqlUpdateYaExiste | Out-Null
+                    $count++
+                    continue
                 }
 
                 $sqlCabecera = @"

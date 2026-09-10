@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -176,13 +176,17 @@ namespace ReprediTrayDaemon.Services
                         else if (line.Contains("[OK]", StringComparison.OrdinalIgnoreCase) || line.Contains("éxito", StringComparison.OrdinalIgnoreCase) || line.Contains("exito", StringComparison.OrdinalIgnoreCase))
                         {
                             level = LogLevel.Success;
+                            ErrorCount = 0;
+                            burstAlertTriggered = false;
+                            SilenceAlerts = false;
                         }
 
                         EmitLogLine(line, level);
 
-                        if (ErrorCount > 3 && !burstAlertTriggered && !SilenceAlerts)
+                        if (ErrorCount > 4 && !burstAlertTriggered && !SilenceAlerts)
                         {
                             burstAlertTriggered = true;
+                            SilenceAlerts = true;
                             OnErrorThresholdExceeded?.Invoke(ErrorCount);
                         }
                     }
@@ -211,12 +215,19 @@ namespace ReprediTrayDaemon.Services
                     if (level == LogLevel.Error)
                     {
                         ErrorCount++;
-                        if (ErrorCount > 3 && !burstAlertTriggered && !SilenceAlerts)
+                        if (ErrorCount > 4 && !burstAlertTriggered && !SilenceAlerts)
                         {
                             burstAlertTriggered = true;
+                            SilenceAlerts = true;
                             OnErrorThresholdExceeded?.Invoke(ErrorCount);
                         }
                     }
+                }
+                else if (level == LogLevel.Success)
+                {
+                    ErrorCount = 0;
+                    burstAlertTriggered = false;
+                    SilenceAlerts = false;
                 }
             }
             catch { }

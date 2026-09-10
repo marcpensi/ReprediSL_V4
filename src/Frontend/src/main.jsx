@@ -40,6 +40,12 @@ const HISTORY={
  ]
 };
 
+function Toast({msg,type,onClose}){
+  useEffect(()=>{if(!msg)return;const t=setTimeout(onClose,2000);return()=>clearTimeout(t);},[msg,onClose]);
+  if(!msg) return null;
+  return <div className={`toast toast-${type||'ok'}`}>{msg}</div>;
+}
+
 function Header({online}){
   return <><header className="top"><img src={logo} alt="REPREDISL"/><span className="online"><i className={online?'dot on':'dot'}/>{online?'Online':'Offline'}</span></header><div className="rule"/></>;
 }
@@ -170,6 +176,9 @@ function App(){
  const [draft,setDraft]=useState(null);
  const [modalProduct,setModalProduct]=useState(null);
  const [viewOrder,setViewOrder]=useState(null);
+ const [toast,setToast]=useState({msg:'',type:'ok'});
+ const showToast=useCallback((msg,type='ok')=>setToast({msg,type}),[]);
+ const hideToast=useCallback(()=>setToast({msg:'',type:'ok'}),[]);
 
  useEffect(()=>{
    const handleOnline=()=>setOnline(true);
@@ -358,11 +367,11 @@ function App(){
     setOrders([record, ...orders]);
 
     if (serverOk) {
-      alert(`¡Pedido ${draft.series}/${draft.number} ENVIADO con éxito a la API y registrado en PostgreSQL!\nTotal: ${Number(total).toFixed(2)} €\nPDF descargado.`);
+      showToast(`✅ Pedido ${draft.series}/${draft.number} enviado — ${Number(total).toFixed(2)} €`,'ok');
     } else if (serverError) {
-      alert(`Pedido ${draft.series}/${draft.number} guardado localmente.\nAviso: No se pudo enviar al servidor (${serverError}). Queda pendiente de sincronización.\nPDF descargado.`);
+      showToast(`⚠️ Pedido ${draft.series}/${draft.number} guardado localmente (sin red)`,'warn');
     } else {
-      alert(`Pedido ${draft.series}/${draft.number} guardado localmente (Modo Offline).\nQueda pendiente de sincronizar cuando haya red.\nPDF descargado.`);
+      showToast(`📴 Pedido ${draft.series}/${draft.number} offline — se sincronizará al conectar`,'warn');
     }
 
     setDraft(null);
@@ -400,7 +409,7 @@ function App(){
    else setScreen('config');
  };
 
- return <Layout tab={tab} setTab={changeTab} online={online}>{content}{modalProduct&&<AddModal product={modalProduct} onClose={()=>setModalProduct(null)} onAdd={qty=>addToDraft(modalProduct,qty)}/>}</Layout>;
+  return <Layout tab={tab} setTab={changeTab} online={online}>{content}{modalProduct&&<AddModal product={modalProduct} onClose={()=>setModalProduct(null)} onAdd={qty=>addToDraft(modalProduct,qty)}/>}<Toast msg={toast.msg} type={toast.type} onClose={hideToast}/></Layout>;
 }
 
 const money=n=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n||0);
