@@ -3,7 +3,9 @@
 
 export const CONFIG = {
   // --- API / PostgREST ---
-  HISTORIAL_TABLE: 'zlineas_plantillas',
+  HISTORIAL_TABLE: 'historial',
+  CATALOGO_TABLE: 'catalogo',
+  CATALOGO_TARIFA: 1,
   HISTORIAL_LIMIT: 100,
   CLIENTES_LIMIT: 30,
   PRODUCTOS_LIMIT: 100,
@@ -12,10 +14,10 @@ export const CONFIG = {
   HISTORIAL_COLUMN_MAP: {
     clienteCode:  ['id_cliente', 'cliente_code', 'codigo_cliente'],
     productoCode: ['id_producto', 'producto_code', 'codigo'],
-    nombre:       ['nombre', 'descripcion', 'nombre_producto'],
+    nombre:       ['nombre_producto', 'nombre', 'descripcion'],
     cantidad:     ['cantidad', 'uds', 'unidades'],
     precio:       ['precio', 'precio_unitario', 'pv'],
-    fecha:        ['fecha', 'fecha_venta', 'fecha_albaran']
+    fecha:        ['fecha_uventa', 'fecha', 'fecha_venta', 'fecha_albaran']
   },
 
   // --- IndexedDB ---

@@ -66,39 +66,7 @@ try {
     $accessApp.OpenCurrentDatabase($pathDestino)
     $db = $accessApp.CurrentDb()
 
-    Write-Host "[3/4] Creando / actualizando consultas API en MDB..." -ForegroundColor Yellow
-    
-    $queries = [ordered]@{
-        "QryClientesApi" = "SELECT CodCliente AS id_cliente, CodCliente AS codigo, NombreFiscal AS nombre, NombreComercial AS nombre_comercial, NifCIF AS nif, Telefono AS telefono, Movil AS movil, Email AS email, Web AS web, Direccion AS street, CodPostal AS codigo_postal, Poblacion AS city, Provincia AS state, DireccionEnvio AS direccionenvio, CodPostalEnvio AS cpostalenvio, PoblacionEnvio AS poblacionenvio, ProvinciaEnvio AS provinciaenvio, Banco AS nombre_banco, IBAN AS cuenta_bancaria, CodVendedor AS id_vendedor FROM Clientes";
-        "QryVendedoresApi" = "SELECT CodVendedor AS id_vendedor, Nombre AS nombre_vendedor, Serie AS serie FROM Vendedores";
-        "QryTarifasApi" = "SELECT CodTarifa AS id_tarifa, NombreTarifa AS nombre_tarifa, Descuento AS descuento FROM Tarifas";
-        "QryPreciosApi" = "SELECT CodProducto AS id_producto, CodProducto AS codigo, CodTarifa AS id_tarifa, PrecioVenta AS precio_venta FROM Precios";
-        "QryUventasApi" = "SELECT CodProducto AS id_producto, CodProducto AS codigo, UnidadesCaja AS unidades_caja, UnidadVenta AS unidad_venta FROM Uventas"
-    }
-
-    foreach ($qName in $queries.Keys) {
-        $sqlText = $queries[$qName]
-        $qdf = $null
-        try {
-            $qdf = $db.QueryDefs($qName)
-            $qdf.SQL = $sqlText
-            Write-Host "      Consulta ${qName} actualizada." -ForegroundColor Gray
-        } catch {
-            try {
-                $qdf = $db.CreateQueryDef($qName, $sqlText)
-                Write-Host "      Consulta ${qName} creada." -ForegroundColor Green
-            } catch {
-                Write-Host "      Aviso creando ${qName}: $_" -ForegroundColor Yellow
-            }
-        } finally {
-            if ($qdf) {
-                try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($qdf) | Out-Null } catch {}
-                $qdf = $null
-            }
-        }
-    }
-
-    Write-Host "[4/4] Inyectando modulo VBA ($ModuloBas)..." -ForegroundColor Yellow
+    Write-Host "[3/3] Inyectando modulo VBA ($ModuloBas)..." -ForegroundColor Yellow
     if (Test-Path $pathModulo) {
         try {
             $accessApp.LoadFromText(5, "modActBdApi", $pathModulo) # acModule = 5

@@ -1,4 +1,4 @@
-import { CONFIG } from './config';
+import { CONFIG } from './config.js';
 
 export const API_URL = (import.meta.env?.VITE_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 
@@ -161,7 +161,8 @@ export function normalizeProduct(row) {
 }
 
 export async function loadProductsApi({ signal } = {}) {
-  const url = `${API_URL}/productos?order=codigo.asc&limit=${CONFIG.PRODUCTOS_LIMIT}`;
+  const table = CONFIG.CATALOGO_TABLE || 'catalogo';
+  const url = `${API_URL}/${table}?limit=${CONFIG.PRODUCTOS_LIMIT}`;
   const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const data = await response.json();

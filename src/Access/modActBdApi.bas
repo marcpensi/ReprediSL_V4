@@ -39,44 +39,49 @@ Private Const dbDecimal As Long = 20
 
 Public Function ExportarTablas() As Boolean
 
-    Dim nomTabla(0 To 4) As String
-    Dim i As Long
+    Dim qdf As Object
+    Dim qryNameLower As String
+    Dim nucleo As String
     Dim nomTab As String
-    Dim nomQry As String
+    Dim countExportadas As Long
 
     RegistrarLogSync "DEBUG STEP 1: Entrando en ExportarTablas"
 
     On Error GoTo Err_Handler
 
     RegistrarLogSync "DEBUG STEP 2: Control de la sincronizacion activo"
-    
-    ' 1. Asegurar que las consultas y campos necesarios existan en Access
-    RegistrarLogSync "DEBUG STEP 3: ActualizarEstructuraAccess..."
-    ActualizarEstructuraAccess
-    RegistrarLogSync "DEBUG STEP 4: Estructura OK"
-
-    nomTabla(0) = "clientes"
-    nomTabla(1) = "vendedores"
-    nomTabla(2) = "tarifas"
-    nomTabla(3) = "precios"
-    nomTabla(4) = "uventas"
 
     RegistrarLogSync "DEBUG STEP 5: AbrirConexionPostgres..."
     Set db = CurrentDb
     Set cn = AbrirConexionPostgres()
     RegistrarLogSync "DEBUG STEP 6: Conectado a Postgres"
 
-    For i = LBound(nomTabla) To UBound(nomTabla)
-        nomTab = nomTabla(i)
-        nomQry = "Qry" & UCase$(Left$(nomTab, 1)) & Mid$(nomTab, 2) & "Api"
-        RegistrarLogSync "DEBUG STEP 7: Exportando " & nomQry
-        ExportarQueryAPostgres nomQry, nomTab
-    Next i
+    countExportadas = 0
+    For Each qdf In db.QueryDefs
+        qryNameLower = LCase$(qdf.Name)
+        ' Solo consultas que empiecen por qry y terminen por api
+        If Left$(qryNameLower, 3) = "qry" And Right$(qryNameLower, 3) = "api" And Len(qryNameLower) > 6 Then
+            nucleo = Mid$(qryNameLower, 4, Len(qryNameLower) - 6)
+            Select Case nucleo
+                Case "uventas"
+                    nomTab = "historial"
+                Case "precios"
+                    nomTab = "catalogo"
+                Case "tarifas"
+                    nomTab = "tarifas"
+                Case Else
+                    nomTab = nucleo
+            End Select
+            RegistrarLogSync "DEBUG STEP 7: Exportando " & qdf.Name & " -> " & nomTab
+            ExportarQueryAPostgres qdf.Name, nomTab
+            countExportadas = countExportadas + 1
+        End If
+    Next qdf
 
-    RegistrarLogSync "DEBUG STEP 8: Permisos"
+    RegistrarLogSync "DEBUG STEP 8: Permisos (" & CStr(countExportadas) & " tablas exportadas)"
     AplicarPermisosAPostgres
 
-    RegistrarLogSync "Sincronizacion masiva finalizada con exito [OK]."
+    RegistrarLogSync "Sincronizacion masiva finalizada con exito [OK]. Consultas exportadas: " & CStr(countExportadas)
     ExportarTablas = True
 
 Salir:
@@ -104,71 +109,6 @@ Err_Handler:
 End Function
 
 ' =========================================================
-' ACTUALIZADOR AUTOMATICO DE ESTRUCTURA Y CONSULTAS ACCESS
-' =========================================================
-
-Public Sub ActualizarEstructuraAccess()
-
-    Dim localDb As DAO.Database
-    Set localDb = CurrentDb
-
-    On Error Resume Next
-
-    ' 1. Asegurar Campos de Control en Tablas Principales (si existen)
-    AsegurarCampoAccess localDb, "Clientes", "fecha_modificacion", "DATETIME"
-    AsegurarCampoAccess localDb, "Clientes", "activo", "BIT"
-    AsegurarCampoAccess localDb, "Productos", "fecha_modificacion", "DATETIME"
-
-    ' 2. Crear / Actualizar las 5 Consultas API Requeridas
-    CrearOCambiarConsultaAPI localDb, "QryClientesApi", _
-        "SELECT [Clientes].[Codigo] AS id_cliente, [Clientes].[Codigo] AS codigo, [Clientes].[Nombre] AS nombre, " & _
-        "[Clientes].[NombreComercial] AS nombre_comercial, [Clientes].[Nif] AS nif, " & _
-        "[Clientes].[Vendedor] AS id_vendedor FROM Clientes"
-
-    CrearOCambiarConsultaAPI localDb, "QryVendedoresApi", _
-        "SELECT [Vendedores].[Codigo] AS id_vendedor, [Vendedores].[Nombre] AS nombre_vendedor FROM Vendedores"
-
-    CrearOCambiarConsultaAPI localDb, "QryTarifasApi", _
-        "SELECT [Tarifas].[Codigo] AS id_tarifa, [Tarifas].[Nombre] AS nombre_tarifa FROM Tarifas"
-
-    CrearOCambiarConsultaAPI localDb, "QryPreciosApi", _
-        "SELECT [Precios].[Articulo] AS id_producto, [Precios].[Articulo] AS codigo, [Precios].[Tarifa] AS id_tarifa, [Precios].[Precio] AS precio_venta FROM Precios"
-
-    CrearOCambiarConsultaAPI localDb, "QryUventasApi", _
-        "SELECT [Articulos].[Codigo] AS id_producto, [Articulos].[Codigo] AS codigo, [Articulos].[BultosPredet] AS unidades_caja, [Articulos].[Unidad] AS unidad_venta FROM Articulos"
-
-    Set localDb = Nothing
-End Sub
-
-Private Sub AsegurarCampoAccess(ByRef dbs As DAO.Database, ByVal tabla As String, ByVal campo As String, ByVal tipoSql As String)
-    On Error Resume Next
-    Dim tdf As DAO.TableDef
-    Dim fld As DAO.Field
-    Set tdf = dbs.TableDefs(tabla)
-    If Err.Number = 0 Then
-        Set fld = tdf.Fields(campo)
-        If Err.Number <> 0 Then
-            Err.Clear
-            dbs.Execute "ALTER TABLE [" & tabla & "] ADD COLUMN [" & campo & "] " & tipoSql
-        End If
-    End If
-    Err.Clear
-End Sub
-
-Private Sub CrearOCambiarConsultaAPI(ByRef dbs As DAO.Database, ByVal nomConsulta As String, ByVal sqlText As String)
-    On Error Resume Next
-    Dim qdf As DAO.QueryDef
-    Set qdf = dbs.QueryDefs(nomConsulta)
-    If Err.Number = 0 Then
-        qdf.SQL = sqlText
-    Else
-        Err.Clear
-        dbs.CreateQueryDef nomConsulta, sqlText
-    End If
-    Err.Clear
-End Sub
-
-' =========================================================
 ' EXPORTAR QUERY ACCESS A POSTGRESQL (OPTIMIZADO EN BATCHES)
 ' =========================================================
 
@@ -189,7 +129,30 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
     On Error GoTo Err_Handler
 
     NombreMostrar = UCase$(Left$(NombreTabla, 1)) & Mid$(NombreTabla, 2)
-    Set rs = db.OpenRecordset(NombreQuery, dbOpenSnapshot)
+
+    Dim sqlSource As String
+    Dim fldCheck As DAO.Field
+    Dim rsSchema As DAO.Recordset
+
+    sqlSource = "SELECT * FROM [" & NombreQuery & "]"
+    If NombreTabla = "catalogo" Then
+        On Error Resume Next
+        Set rsSchema = db.OpenRecordset("SELECT * FROM [" & NombreQuery & "] WHERE 1=0", dbOpenSnapshot)
+        If Err.Number = 0 Then
+            For Each fldCheck In rsSchema.Fields
+                If LCase$(fldCheck.Name) = "tarifa" Or LCase$(fldCheck.Name) = "id_tarifa" Or LCase$(fldCheck.Name) = "codtarifa" Then
+                    sqlSource = "SELECT * FROM [" & NombreQuery & "] WHERE [" & fldCheck.Name & "] = 1"
+                    Exit For
+                End If
+            Next fldCheck
+            rsSchema.Close
+        End If
+        Set rsSchema = Nothing
+        Err.Clear
+        On Error GoTo Err_Handler
+    End If
+
+    Set rs = db.OpenRecordset(sqlSource, dbOpenSnapshot)
 
     ' Calcular total de filas
     If Not rs.EOF Then

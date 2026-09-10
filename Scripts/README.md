@@ -43,7 +43,7 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 - **Objetivo:** Ejecuta la rutina masiva VBA `ExportarTablas()` desde fuera de Access (sin necesidad de abrir Access a mano).
 
 ### 3. [`MigrarYActualizarAccess.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Migracion/MigrarYActualizarAccess.ps1) & [`MIGRAR_Y_ACTUALIZAR_ACCESS.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/MIGRAR_Y_ACTUALIZAR_ACCESS.bat)
-- **Objetivo:** Copia la base origen a `bddestino.mdb`, genera las 5 consultas `Qry*Api` e inyecta [`modActBdApi.bas`](file:///d:/programacio/repredi/ReprediSL_V4/src/Access/modActBdApi.bas).
+- **Objetivo:** Copia la base origen a `bddestino.mdb` (si procede) e inyecta [`modActBdApi.bas`](file:///d:/programacio/repredi/ReprediSL_V4/src/Access/modActBdApi.bas), exportando dinámicamente y de forma no intrusiva las consultas `qry*api` existentes en Access a PostgreSQL sin inventar ni alterar consultas del usuario.
 
 ### 4. `ARRANCAR_POSTGREST.bat`
 - **Objetivo:** Inicia el servidor PostgREST 16 empleando la configuración de `src/API/postgrest.conf`.

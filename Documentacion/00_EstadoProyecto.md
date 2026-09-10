@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
 **Fecha de actualización:** 10-09-2026  
-**Versión:** 4.5.0  
-**Estado General:** Estable y Operativo (Consolidación V4.5.0 - Centro de Control Unificado de Procesos y Servicios en ReprediTrayDaemon, Monitorización en Tiempo Real de PostgreSQL, PostgREST, Caddy y Sincronizador ERP, Eliminación de Ventanas CMD Dispersas)
+**Versión:** 4.8.0  
+**Estado General:** Operativo y Desplegado en Producción (Consolidación V4.8.0 - Sincronización Canónica Estricta Access qry*api sin alteración de esquemas, Mapeo Historial/Catálogo/Tarifas, Corrección de Contraste en Modal de Añadir Artículos, Pruebas 5/5 OK y Despliegue en Hostinger)
 
 ---
 
@@ -29,6 +29,10 @@
 - [x] **Identificación de Serie Comercial Real (`VD`):** Corrección del prefijo en la numeración para reflejar la serie del vendedor (`VD-2988` en vez de `P-2988`), capturando el importe real y asociando correctamente `Serie` y `NumPedido` en las tablas `PedidosCab` y `PedidosLin`.
 - [x] **Script de Migración .MDB Externo:** Automatización completa que clona `dborigen.mdb` -> `bddestino.mdb`, actualiza esquemas/consultas DAO e inyecta el código VBA sin intervención manual.
 - [x] **Centro de Control Unificado de Procesos y Servicios (V4.5.0):** Centralización del arranque, parada y monitorización en vivo de todos los procesos del sistema (PostgreSQL 16, PostgREST API, Caddy Reverse Proxy, Sincronizador de Pedidos y Access ERP) en un único módulo visual (`ReprediTrayDaemon`). Incluye botonera maestra («Arrancar Todo», «Detener Todo», «Reiniciar»), tiles con estado en vivo (🟢/🔴/🟡) y control individual, integración con `ARRANCAR_TODO.bat` mediante `--start-all` (sin consolas CMD sueltas), salida unificada de logs en consola y acceso rápido en la bandeja del sistema.
+- [x] **Sincronización Canónica Estricta Access `qry*api` (V4.8.0):** Supresión total de rutinas de creación/alteración arbitraria de consultas y campos en Access (`ActualizarEstructuraAccess`). Exportación 100% dinámica de las consultas cuyo nombre comience por `qry` y finalice por `api`. Mapeo canónico a PostgreSQL: `qryuventasapi` $\rightarrow$ `historial`, `qrypreciosapi` $\rightarrow$ `catalogo` (tarifa 1 o configurable), `qrytarifasapi` $\rightarrow$ `tarifas`, y el resto por nombre base (`clientes`, `vendedores`...).
+- [x] **Gestión Local de Pedidos y Filtrado de Historial (V4.8.0):** Los pedidos se crean, persisten y mantienen en el cliente remoto (IndexedDB de la PWA) y se transmiten a la API mediante HTTP POST. La consulta de historial en la PWA se filtra en tiempo real por el código del cliente seleccionado.
+- [x] **Corrección de Visibilidad UI en Modal de Artículos (V4.8.0):** Solucionado el problema de contraste en el botón «Aceptar» de la ventana modal de añadir artículos (`AddModal`), estableciendo estilos de alta especificidad para estado normal y deshabilitado.
+- [x] **Auditoría, Despliegue en Hostinger y Tag v4.8.0:** Pruebas unitarias automatizadas 5/5 superadas, paquete frontend compilado con Vite y desplegado a producción en `https://pedidos.repredisl.com`.
 
 ---
 
