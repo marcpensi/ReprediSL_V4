@@ -2,15 +2,15 @@
 chcp 65001 > nul
 title ReprediSL V4 - Centro de Control y Servicios
 echo =========================================================
-echo  REPREDISL V4 - CENTRO DE CONTROL Y SERVICIOS
+echo   REPREDISL V4 - CENTRO DE CONTROL Y SERVICIOS
 echo =========================================================
 echo.
-echo Iniciando Centro de Control Unificado...
-echo - Se monitorizarán y arrancarán todos los servicios en un único módulo:
-echo   1. PostgreSQL 16 (Puerto 5432 / repredisl_api)
-echo   2. PostgREST API (Puerto 3000)
-echo   3. Caddy Reverse Proxy (HTTPS 443 / SSL)
-echo   4. Sincronizador de Pedidos (Access ERP)
+echo   Iniciando Centro de Control Unificado...
+echo   Servicios gestionados:
+echo     1. PostgreSQL 16 (Puerto 5432 / repredisl_api)
+echo     2. PostgREST API (Puerto 3000)
+echo     3. Caddy Reverse Proxy (HTTPS 443 / SSL)
+echo     4. Sincronizador de Pedidos (Access ERP)
 echo.
 
 set "DAEMON_EXE=%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
@@ -24,9 +24,8 @@ if not exist "%DAEMON_EXE%" (
 start "" "%DAEMON_EXE%" --start-all
 
 echo =========================================================
-echo  [OK] Centro de Control iniciado.
-echo  Puedes ver el estado en vivo y gestionar todos los procesos
-echo  desde la ventana abierta o desde la bandeja junto al reloj.
+echo   [OK] Centro de Control iniciado.
+echo   Ver estado y gestionar desde la ventana o la bandeja.
 echo =========================================================
 echo.
 ping -n 3 127.0.0.1 > nul
