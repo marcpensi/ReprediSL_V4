@@ -20,6 +20,7 @@ function Get-AbsolutePath([string]$path) {
 # Resolucion dinamica de la ruta gestion.mdb (donde entran y se confirman los pedidos)
 if (-not $DbMdb -or $DbMdb -eq "src/Access/BdDestino.mdb") {
     $candidatos = @(
+        "C:\pensi\psgestw\e0012026\gestion.mdb",
         (Join-Path $ProjectRoot "src/Access/E0012026/gestion.mdb"),
         (Join-Path $ProjectRoot "src/Access/gestion.mdb"),
         "C:\PsGest\E0012026\gestion.mdb",

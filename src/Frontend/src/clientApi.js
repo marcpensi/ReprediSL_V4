@@ -154,3 +154,22 @@ export async function loadTarifasApi(idTarifa, {signal} = {}) {
   return Array.isArray(data) ? data : [];
 }
 
+export async function createOrderApi(orderPayload, {signal} = {}) {
+  const url = `${API_URL}/pedidos`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(orderPayload),
+    signal
+  });
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status} ${response.statusText}: ${errBody}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data[0] : data;
+}
+

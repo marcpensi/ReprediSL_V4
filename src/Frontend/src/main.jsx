@@ -10,7 +10,7 @@ import {
 import './styles.css';
 import logo from './assets/repredisl-logo.png';
 import {allCachedClients, cacheClient, cacheClients, clearClientCache, recentCachedClients, searchCachedClients, allCachedProducts, cacheProducts, clearProductCache} from './db';
-import {API_URL, loadInitialClientsApi, searchClientsApi, syncCachedClientsApi, loadProductsApi, loadTarifasApi} from './clientApi';
+import {API_URL, loadInitialClientsApi, searchClientsApi, syncCachedClientsApi, loadProductsApi, loadTarifasApi, createOrderApi} from './clientApi';
 
 const SELLERS=[
   {code:1,name:'Axa',series:'V1'},{code:2,name:'Fábrica 2',series:'V2'},{code:3,name:'Fábrica 3',series:'V3'},
@@ -305,13 +305,70 @@ function App(){
    const number=(nums.length?Math.max(...nums):2987)+1;
    setClient(c);setDraft({series:seller.series,number,sellerName:seller.name,clientCode:c.code,lines:[]});setTab('orders');setScreen('orderEdit');
  };
- const finalize=(total)=>{
-   downloadPdf(draft,client,total);
-   const record={id:Date.now(),series:draft.series,number:draft.number,date:new Date().toLocaleDateString('es-ES'),clientCode:client.code,clientName:client.commercial,sellerName:seller.name,total,status:online?'Enviado':'Pendiente sync',lines:draft.lines.map(x=>({...x}))};
-   setOrders([record,...orders]);
-   alert(online?`Pedido ${draft.series}/${draft.number} generado. PDF creado y registro preparado para el servidor. Cliente: ${client.email}`:`Pedido ${draft.series}/${draft.number} guardado localmente. Queda pendiente de sincronizar. PDF generado.`);
-   setDraft(null);setTab('clients');setScreen('clientOrders');
- };
+ const finalize = async (total) => {
+    downloadPdf(draft, client, total);
+    
+    let orderStatus = online ? 'Enviado' : 'Pendiente sync';
+    let serverOk = false;
+    let serverError = '';
+
+    const orderPayload = {
+      id_cliente: Number(client.code) || 0,
+      cliente: client.commercial || client.fiscal || `Cliente ${client.code}`,
+      total: Number(total) || 0,
+      serie: String(draft.series || '1'),
+      numero_pedido: Number(draft.number) || 0,
+      id_vendedor: Number(seller?.code) || 1,
+      vendedor: seller?.name || '',
+      id_forma_pago: Number(client.paymentMethodId) || 1,
+      id_tarifa: Number(client.rateId) || 1,
+      lineas: (draft.lines || []).map(l => ({
+        code: l.code,
+        desc: l.name || l.desc || l.description || '',
+        qty: Number(l.qty) || 1,
+        price: Number(l.price) || 0,
+        subtotal: Number(((Number(l.qty) || 1) * (Number(l.price) || 0)).toFixed(2))
+      }))
+    };
+
+    if (online) {
+      try {
+        await createOrderApi(orderPayload);
+        serverOk = true;
+      } catch (err) {
+        console.warn('Error enviando pedido a la API:', err);
+        orderStatus = 'Pendiente sync';
+        serverError = err.message;
+      }
+    }
+
+    const record = {
+      id: Date.now(),
+      series: draft.series,
+      number: draft.number,
+      date: new Date().toLocaleDateString('es-ES'),
+      clientCode: client.code,
+      clientName: client.commercial,
+      sellerName: seller.name,
+      total,
+      status: orderStatus,
+      lines: draft.lines.map(x => ({ ...x }))
+    };
+
+    setOrders([record, ...orders]);
+
+    if (serverOk) {
+      alert(`¡Pedido ${draft.series}/${draft.number} ENVIADO con éxito a la API y registrado en PostgreSQL!\nTotal: ${Number(total).toFixed(2)} €\nPDF descargado.`);
+    } else if (serverError) {
+      alert(`Pedido ${draft.series}/${draft.number} guardado localmente.\nAviso: No se pudo enviar al servidor (${serverError}). Queda pendiente de sincronización.\nPDF descargado.`);
+    } else {
+      alert(`Pedido ${draft.series}/${draft.number} guardado localmente (Modo Offline).\nQueda pendiente de sincronizar cuando haya red.\nPDF descargado.`);
+    }
+
+    setDraft(null);
+    setTab('clients');
+    setScreen('clientOrders');
+  };
  const addToDraft=(p,qty)=>{
    if(!draft){alert('Primero crea un pedido desde un cliente.');setModalProduct(null);return;}
    const exists=draft.lines.find(l=>l.code===p.code);

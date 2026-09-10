@@ -8,13 +8,11 @@ async function main() {
   const projectRoot = path.resolve(import.meta.dirname, "../..");
   const distDir = path.join(projectRoot, "src", "Frontend", "dist");
 
-  if (!fs.existsSync(distDir) || !fs.existsSync(path.join(distDir, "index.html"))) {
-    console.log("Compilando Frontend antes de publicar...");
-    execSync("npm run build", { cwd: path.join(projectRoot, "src", "Frontend"), stdio: "inherit" });
-  }
+  console.log("Compilando Frontend con npm run build...");
+  execSync("npm run build", { cwd: path.join(projectRoot, "src", "Frontend"), stdio: "inherit" });
 
-  const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15).replace(/^(\d{8})(\d{6})$/, "$1_$2");
-  const zipPath = path.join(projectRoot, "src", "Frontend", `dist_${timestamp}.zip`);
+  const zipName = `dist_${Date.now()}.zip`;
+  const zipPath = path.join(projectRoot, "src", "Frontend", zipName);
 
   console.log(`Generando paquete comprimido: ${zipPath}`);
   execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${distDir}\\*' -DestinationPath '${zipPath}' -Force"`);
@@ -47,6 +45,12 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 
   await client.close();
+
+  const textResp = result?.content?.[0]?.text || "";
+  if (textResp.includes('"status":"error"') || textResp.includes('"error"')) {
+    throw new Error(`El despliegue falló en Hostinger: ${textResp}`);
+  }
+
   console.log("¡Publicación en https://pedidos.repredisl.com completada con éxito!");
 }
 

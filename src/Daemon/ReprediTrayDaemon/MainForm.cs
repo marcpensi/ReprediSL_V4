@@ -1188,10 +1188,15 @@ namespace ReprediTrayDaemon
                 !message.Contains("[AUTO-ACEPTADO]", StringComparison.OrdinalIgnoreCase) &&
                 !message.Contains("[PEDIDO PENDIENTE]", StringComparison.OrdinalIgnoreCase))
             {
-                var match = System.Text.RegularExpressions.Regex.Match(message, @"\[NUEVO PEDIDO\]\s+Recibido pedido N\.\s+([^\s|]+)(?:\s+\|?\s*Cliente:\s*([^|]+))?");
-                string numPed = match.Success && match.Groups[1].Value.Length > 0 ? match.Groups[1].Value : $"P-{DateTime.Now:HHmmss}";
+                var match = System.Text.RegularExpressions.Regex.Match(message, @"\[NUEVO PEDIDO\]\s+Recibido pedido N\.\s+([^\s|]+)(?:.*?Cliente:\s*([^|]+))?(?:.*?Importe:\s*([\d.,]+))?");
+                string numPed = match.Success && match.Groups[1].Value.Length > 0 ? match.Groups[1].Value : $"VD-{DateTime.Now:HHmmss}";
                 string cliente = match.Success && match.Groups[2].Success ? match.Groups[2].Value.Trim() : "Cliente ERP";
-                ProcesarLlegadaPedido(numPed, cliente, 100.00m);
+                decimal importe = 100.00m;
+                if (match.Success && match.Groups[3].Success && decimal.TryParse(match.Groups[3].Value.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal parsedImp))
+                {
+                    importe = parsedImp;
+                }
+                ProcesarLlegadaPedido(numPed, cliente, importe);
             }
             else
             {

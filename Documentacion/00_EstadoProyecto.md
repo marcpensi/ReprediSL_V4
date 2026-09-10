@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
-**Fecha de actualización:** 09-09-2026  
-**Versión:** 4.3.0  
-**Estado General:** Estable y Operativo (Consolidación V4.3.0 - Dashboard de Telemetría Avanzado, Pipeline Visual, Segmented Pill Switch y Estandarización UTF-8 BOM en Demonio C# .NET 10)
+**Fecha de actualización:** 10-09-2026  
+**Versión:** 4.4.0  
+**Estado General:** Estable y Operativo (Consolidación V4.4.0 - Integración Completa PWA a Access ERP en Producción C:\pensi\psgestw, Soporte de Series Comerciales Reales y Lanzadores Maestros del Ecosistema)
 
 ---
 
@@ -24,6 +24,9 @@
 - [x] **Dashboard de Telemetría y Pipeline Visual (V4.3.0):** Rediseño completo de la interfaz WinForms con Segmented Pill Switch (Auto vs Manual), diagrama visual reactivo de Pipeline de datos (Postgres 16 ⇄ PsSyncBridge ⇄ Access ERP), 4 tarjetas métricas (Reloj sinc, Uptime, Procesados, Pendientes), barra de sub-métricas, visor modal de pedidos y estandarización estricta UTF-8 con BOM en código fuente C#.
 - [x] **Integración con Servidor MCP-Access:** Configuración oficial del servidor MCP (`luna-soft.access-explorer`) en `.vscode/mcp.json` para consulta e inspección de `gestion.mdb` asistida por IA.
 - [x] **Sincronización Dinámica Postgres (`DROP CASCADE`):** Recreación automática de tablas en PostgreSQL con `DROP TABLE ... CASCADE` en `modActBdApi.bas` para garantizar coincidencia total de esquemas con las consultas API.
+- [x] **Pipeline Completo de Pedidos PWA -> API -> Access ERP:** Implementada la inserción HTTP POST en la PWA (`https://pedidos.repredisl.com`), endpoint `/pedidos` en PostgREST (`https://api.repredisl.com`), persistencia en PostgreSQL (`public.pedidos_nuevos`) y sincronizador en tiempo real (`SincronizarPedidosEntrantes.ps1` / `ARRANCAR_SYNC_PEDIDOS.bat`) que alimenta `sync_progress.log`, alerta al demonio de bandeja `ReprediTrayDaemon` e inserta cabecera y líneas en `PedidosCab` y `PedidosLin` de Microsoft Access.
+- [x] **Configuración Base ERP Producción PsGest (`C:\pensi\psgestw\e0012026\gestion.mdb`):** Conexión prioritaria configurada en `DbSyncService.cs`, `SincronizarPedidosEntrantes.ps1` y scripts de exportación para insertar directamente en la base de datos real del ERP de la empresa.
+- [x] **Identificación de Serie Comercial Real (`VD`):** Corrección del prefijo en la numeración para reflejar la serie del vendedor (`VD-2988` en vez de `P-2988`), capturando el importe real y asociando correctamente `Serie` y `NumPedido` en las tablas `PedidosCab` y `PedidosLin`.
 - [x] **Script de Migración .MDB Externo:** Automatización completa que clona `dborigen.mdb` -> `bddestino.mdb`, actualiza esquemas/consultas DAO e inyecta el código VBA sin intervención manual.
 
 ---

@@ -100,6 +100,7 @@ namespace ReprediTrayDaemon.Services
         {
             string[] candidates = new string[]
             {
+                @"C:\pensi\psgestw\e0012026\gestion.mdb",
                 Path.Combine(ProjectRoot, "src", "Access", "E0012026", "gestion.mdb"),
                 Path.Combine(ProjectRoot, "src", "Access", "gestion.mdb"),
                 @"C:\PsGest\E0012026\gestion.mdb",

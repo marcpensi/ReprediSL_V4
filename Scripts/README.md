@@ -58,5 +58,13 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 - **Objetivo:** Inicia el proxy inverso Caddy Server para exponer `api.repredisl.com` con terminación HTTPS segura (puerto 443) y certificado Let's Encrypt automático, redirigiendo el tráfico a PostgREST (`127.0.0.1:3000`).
 
 ### 8. [`ACTUALIZAR_DNS_HOSTINGER.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/ACTUALIZAR_DNS_HOSTINGER.bat) & [`ActualizarDnsApiHostinger.mjs`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/ActualizarDnsApiHostinger.mjs)
-- **Objetivo:** Detecta automáticamente la IP pública actual de la conexión de red y actualiza el registro DNS de tipo `A` para `api.repredisl.com` en los servidores de Hostinger a través del MCP `hostinger-dns-mcp`.
+- **Objetivo:** Actualiza automáticamente el registro DNS tipo A de `api.repredisl.com` en Hostinger con la IP pública actual.
 
+### 9. [`INICIAR_SISTEMA_COMPLETO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/INICIAR_SISTEMA_COMPLETO.bat) & [`ARRANCAR_TODO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/ARRANCAR_TODO.bat)
+- **Objetivo:** Script maestro que arranca de un solo clic los 4 servicios necesarios: PostgREST (API 3000), Caddy (HTTPS 443), Sincronizador de Pedidos a Access y el Demonio de Bandeja de Windows (`ReprediTrayDaemon.exe`).
+
+### 10. [`PARAR_SISTEMA_COMPLETO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/PARAR_SISTEMA_COMPLETO.bat) & [`PARAR_TODO.bat`](file:///d:/programacio/repredi/ReprediSL_V4/PARAR_TODO.bat)
+- **Objetivo:** Script de parada limpia que detiene de golpe todos los servicios (PostgREST, Caddy, Sincronizador PowerShell y Demonio de Bandeja).
+
+### 11. [`SincronizarPedidosEntrantes.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/BaseDatos/SincronizarPedidosEntrantes.ps1) & [`ARRANCAR_SYNC_PEDIDOS.bat`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Desarrollo/ARRANCAR_SYNC_PEDIDOS.bat)
+- **Objetivo:** Proceso en segundo plano que consulta pedidos nuevos en PostgreSQL (`public.pedidos_nuevos`), notifica en tiempo real a `sync_progress.log` para disparar las alertas en `ReprediTrayDaemon.exe` e inserta automáticamente los registros en `PedidosCab` y `PedidosLin` de Microsoft Access (`gestion.mdb`).
