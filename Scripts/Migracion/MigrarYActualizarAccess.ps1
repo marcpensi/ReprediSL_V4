@@ -1,6 +1,6 @@
 param (
     [string]$DbOrigen = "C:\pensi\psgestw\e0012026\gestion.mdb",
-    [string]$DbDestino = "src/Access/BdDestino.mdb",
+    [string]$DbDestino = "src/Access/gestion.mdb",
     [string]$DbReferencia = "src/Access/BdNewRepre.mdb",
     [string]$ModuloBas = "src/Access/modActBdApi.bas"
 )
