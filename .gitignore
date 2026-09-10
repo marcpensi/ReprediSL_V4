@@ -15,3 +15,8 @@ obj/
 ui_settings.json
 backups/
 *.bak
+
+# Bases de datos Access - binarios grandes, no versionar
+# El esquema se exporta en Documentacion/SCHEMA_ACCESS.md
+*.mdb
+*.accdb
