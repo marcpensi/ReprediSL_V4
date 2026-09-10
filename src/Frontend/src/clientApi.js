@@ -1,6 +1,8 @@
-export const API_URL = (import.meta.env?.VITE_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
-const CLIENT_LIMIT = 30;
+import { CONFIG } from './config';
 
+export const API_URL = (import.meta.env?.VITE_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+
+// --- Utilidades ---
 function apiValue(row, ...names) {
   const keys = Object.keys(row || {});
   for (const name of names) {
@@ -11,6 +13,36 @@ function apiValue(row, ...names) {
   return '';
 }
 
+function pickColumn(row, fieldKey) {
+  const candidates = CONFIG.HISTORIAL_COLUMN_MAP[fieldKey] || [];
+  return apiValue(row, ...candidates);
+}
+
+function normalizeHistorial(row) {
+  const clienteCode  = String(pickColumn(row, 'clienteCode') ?? '').trim();
+  const productoCode = String(pickColumn(row, 'productoCode') ?? '').trim();
+  const nombre       = String(pickColumn(row, 'nombre') ?? '').trim();
+  const cantidad     = Number(pickColumn(row, 'cantidad') || 0);
+  const precio       = Number(pickColumn(row, 'precio') || 0);
+  const fecha        = pickColumn(row, 'fecha');
+
+  if (!clienteCode || !productoCode) return null;
+
+  return {
+    clienteCode,
+    productoCode,
+    nombreProducto: nombre || `Producto ${productoCode}`,
+    cantidad,
+    precio: isNaN(precio) ? 0 : precio,
+    fecha: fecha ? new Date(fecha).getTime() : Date.now()
+  };
+}
+
+function escapePostgrestLike(value) {
+  return String(value).replace(/[(),]/g, ' ').replace(/\*/g, '').trim();
+}
+
+// --- Clientes ---
 export function normalizeClient(row) {
   const code = String(apiValue(row, 'id_cliente', 'codigo', 'code', 'id') ?? '').trim();
   const commercial = String(apiValue(row, 'nombre_comercial', 'nombrecomercial', 'commercial', 'nombre') ?? '').trim();
@@ -55,21 +87,16 @@ export function normalizeClient(row) {
   };
 }
 
-function escapePostgrestLike(value) {
-  // Evita que caracteres de control rompan el filtro PostgREST.
-  return String(value).replace(/[(),]/g, ' ').replace(/\*/g, '').trim();
-}
-
-export async function loadInitialClientsApi({signal} = {}) {
-  const url = `${API_URL}/clientes?order=id_cliente.asc&limit=${CLIENT_LIMIT}`;
-  const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+export async function loadInitialClientsApi({ signal } = {}) {
+  const url = `${API_URL}/clientes?order=id_cliente.asc&limit=${CONFIG.CLIENTES_LIMIT}`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const data = await response.json();
   if (!Array.isArray(data)) throw new Error('La API no ha devuelto una lista de clientes');
   return data.map(normalizeClient).filter(c => c.code);
 }
 
-export async function searchClientsApi(text, {signal} = {}) {
+export async function searchClientsApi(text, { signal } = {}) {
   const term = escapePostgrestLike(text);
   if (term.length < 2) return [];
 
@@ -78,13 +105,11 @@ export async function searchClientsApi(text, {signal} = {}) {
     `nombre_comercial.ilike.*${term}*`,
     `nif.ilike.*${term}*`
   ];
-
-  // Si es numérico también intenta el código exacto, que normalmente es bigint.
   if (/^\d+$/.test(term)) filters.push(`id_cliente.eq.${Number(term)}`);
 
   const orFilter = encodeURIComponent(`(${filters.join(',')})`);
-  const url = `${API_URL}/clientes?or=${orFilter}&limit=${CLIENT_LIMIT}`;
-  const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+  const url = `${API_URL}/clientes?or=${orFilter}&limit=${CONFIG.CLIENTES_LIMIT}`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
 
   const data = await response.json();
@@ -92,8 +117,7 @@ export async function searchClientsApi(text, {signal} = {}) {
   return data.map(normalizeClient).filter(c => c.code);
 }
 
-
-export async function syncCachedClientsApi(codes, {signal} = {}) {
+export async function syncCachedClientsApi(codes, { signal } = {}) {
   const numericCodes = [...new Set((codes || [])
     .map(code => String(code ?? '').trim())
     .filter(code => /^\d+$/.test(code))
@@ -104,9 +128,8 @@ export async function syncCachedClientsApi(codes, {signal} = {}) {
   const result = [];
   for (let i = 0; i < numericCodes.length; i += BATCH) {
     const batch = numericCodes.slice(i, i + BATCH);
-    const filter = batch.join(',');
-    const url = `${API_URL}/clientes?id_cliente=in.(${filter})`;
-    const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+    const url = `${API_URL}/clientes?id_cliente=in.(${batch.join(',')})`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
     if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
     const data = await response.json();
     if (!Array.isArray(data)) throw new Error('La API no ha devuelto una lista de clientes');
@@ -115,6 +138,7 @@ export async function syncCachedClientsApi(codes, {signal} = {}) {
   return result;
 }
 
+// --- Productos ---
 export function normalizeProduct(row) {
   const code = String(apiValue(row, 'codigo', 'id_producto', 'code', 'id') ?? '').trim();
   const name = String(apiValue(row, 'nombre', 'descripcion', 'name') ?? '').trim();
@@ -136,25 +160,47 @@ export function normalizeProduct(row) {
   };
 }
 
-export async function loadProductsApi({signal} = {}) {
-  const url = `${API_URL}/productos?order=codigo.asc&limit=100`;
-  const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+export async function loadProductsApi({ signal } = {}) {
+  const url = `${API_URL}/productos?order=codigo.asc&limit=${CONFIG.PRODUCTOS_LIMIT}`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const data = await response.json();
   if (!Array.isArray(data)) throw new Error('La API no ha devuelto una lista de productos');
   return data.map(normalizeProduct).filter(p => p.code);
 }
 
-export async function loadTarifasApi(idTarifa, {signal} = {}) {
+export async function loadTarifasApi(idTarifa, { signal } = {}) {
   if (!idTarifa) return [];
   const url = `${API_URL}/tarifas?id_tarifa=eq.${encodeURIComponent(idTarifa)}`;
-  const response = await fetch(url, {headers: {Accept: 'application/json'}, signal});
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 }
 
-export async function createOrderApi(orderPayload, {signal} = {}) {
+// --- Historial de ventas ---
+export async function loadHistorialVentasApi(clienteCode, { signal } = {}) {
+  if (!clienteCode) return [];
+
+  const url = `${API_URL}/${CONFIG.HISTORIAL_TABLE}?` +
+    `id_cliente=eq.${encodeURIComponent(clienteCode)}&` +
+    `order=fecha.desc&limit=${CONFIG.HISTORIAL_LIMIT}`;
+
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status} al cargar historial`);
+
+  const data = await response.json();
+  if (!Array.isArray(data)) return [];
+
+  return data.map(normalizeHistorial).filter(Boolean);
+}
+
+// --- Pedidos ---
+export async function createOrderApi(orderPayload, { signal } = {}) {
   const url = `${API_URL}/pedidos`;
   const response = await fetch(url, {
     method: 'POST',
@@ -172,4 +218,3 @@ export async function createOrderApi(orderPayload, {signal} = {}) {
   const data = await response.json();
   return Array.isArray(data) ? data[0] : data;
 }
-
