@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -26,6 +26,8 @@ namespace ReprediTrayDaemon
         private FlowLayoutPanel flowSubMetrics = null!;
         private Panel pnlLogConsoleCard = null!;
         private Panel pnlStatusBar = null!;
+        private Panel pnlLogHeader = null!;
+        private TableLayoutPanel tableServices = null!;
 
         // Centro de Control de Servicios
         private Label lblServicesTitle = null!;
@@ -391,17 +393,23 @@ namespace ReprediTrayDaemon
                 out lblNodeAccessStatus, out iconNodeAccess);
             cardNodeAccess.Location = new Point(760, 0);
 
-            // Líneas de conexión
+            // Líneas de conexión dinámicas
             pnlPipelineDiagram.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 Color lineClr = currentTheme == "Oscuro" ? Color.FromArgb(51, 65, 85) : Color.FromArgb(203, 213, 225);
                 using var pen = new Pen(lineClr, 3f);
                 pen.DashStyle = DashStyle.Solid;
-                // Line 1: Pg -> Bridge
-                e.Graphics.DrawLine(pen, 285, 55, 375, 55);
-                // Line 2: Bridge -> Access
-                e.Graphics.DrawLine(pen, 665, 55, 755, 55);
+                if (cardNodePg != null && cardNodeBridge != null && cardNodeAccess != null)
+                {
+                    int x1 = cardNodePg.Right + 4;
+                    int x2 = cardNodeBridge.Left - 4;
+                    if (x2 > x1) e.Graphics.DrawLine(pen, x1, 55, x2, 55);
+
+                    int x3 = cardNodeBridge.Right + 4;
+                    int x4 = cardNodeAccess.Left - 4;
+                    if (x4 > x3) e.Graphics.DrawLine(pen, x3, 55, x4, 55);
+                }
             };
 
             pnlPipelineDiagram.Controls.Add(cardNodePg);
@@ -458,7 +466,7 @@ namespace ReprediTrayDaemon
             pnlLogConsoleCard = CreateRoundedGlassCard(1040, 310, 20);
             pnlLogConsoleCard.Margin = new Padding(0, 0, 0, 16);
 
-            var pnlLogHeader = new Panel
+            pnlLogHeader = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 44,
@@ -585,6 +593,12 @@ namespace ReprediTrayDaemon
 
             this.Controls.Add(pnlMainContent);
 
+            // Responsive Layout: Adaptación fluida a cualquier ancho de ventana
+            this.Resize += (s, e) => UpdateResponsiveLayout();
+            pnlMainContent.SizeChanged += (s, e) => UpdateResponsiveLayout();
+            this.Shown += (s, e) => UpdateResponsiveLayout();
+            UpdateResponsiveLayout();
+
             // ==========================================
             // MENU CONTEXTUAL DEL SYSTEM TRAY
             // ==========================================
@@ -638,7 +652,7 @@ namespace ReprediTrayDaemon
 
         private Panel CreateServicesControlCard()
         {
-            var pnl = CreateRoundedGlassCard(1040, 160, 20);
+            var pnl = CreateRoundedGlassCard(1040, 166, 20);
             pnl.Margin = new Padding(0, 0, 0, 16);
 
             var topBar = new Panel
@@ -726,18 +740,23 @@ namespace ReprediTrayDaemon
             topBar.Controls.Add(btnStopAllServices);
             topBar.Controls.Add(btnRestartAllServices);
 
-            // Contenedor horizontal de las 5 tarjetas de servicios
-            var flowServices = new FlowLayoutPanel
+            // Contenedor responsivo en cuadrícula de 5 columnas (20% cada una)
+            tableServices = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(12, 4, 12, 8),
+                RowCount = 1,
+                ColumnCount = 5,
+                Padding = new Padding(10, 2, 10, 8),
                 BackColor = Color.Transparent
             };
+            tableServices.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            for (int i = 0; i < 5; i++)
+            {
+                tableServices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            }
 
             cardSvcPg = CreateSingleServiceTile("🐘", "PostgreSQL", ":5432 · repredisl_api", out lblSvcPgStatus, out _, null);
-            cardSvcPostgrest = CreateSingleServiceTile("⚡", "PostgREST API", ":3000 · REST", out lblSvcPostgrestStatus, out btnTogglePostgrest,
+            cardSvcPostgrest = CreateSingleServiceTile("⚡", "PostgREST API", ":3000 · REST API", out lblSvcPostgrestStatus, out btnTogglePostgrest,
                 async () =>
                 {
                     if (processManager.GetStatus(ServiceId.Postgrest).State == ServiceStatusState.Activo)
@@ -753,7 +772,7 @@ namespace ReprediTrayDaemon
                     else
                         await processManager.StartCaddyAsync();
                 });
-            cardSvcSync = CreateSingleServiceTile("🔄", "Sync Pedidos", "Postgres → Access", out lblSvcSyncStatus, out btnToggleSync,
+            cardSvcSync = CreateSingleServiceTile("🔄", "Sync Pedidos", "Postgres ➔ Access", out lblSvcSyncStatus, out btnToggleSync,
                 async () =>
                 {
                     if (processManager.GetStatus(ServiceId.SyncPedidos).State == ServiceStatusState.Activo)
@@ -763,13 +782,13 @@ namespace ReprediTrayDaemon
                 });
             cardSvcAccess = CreateSingleServiceTile("📄", "Access ERP", "gestion.mdb", out lblSvcAccessStatus, out _, null);
 
-            flowServices.Controls.Add(cardSvcPg);
-            flowServices.Controls.Add(cardSvcPostgrest);
-            flowServices.Controls.Add(cardSvcCaddy);
-            flowServices.Controls.Add(cardSvcSync);
-            flowServices.Controls.Add(cardSvcAccess);
+            tableServices.Controls.Add(cardSvcPg, 0, 0);
+            tableServices.Controls.Add(cardSvcPostgrest, 1, 0);
+            tableServices.Controls.Add(cardSvcCaddy, 2, 0);
+            tableServices.Controls.Add(cardSvcSync, 3, 0);
+            tableServices.Controls.Add(cardSvcAccess, 4, 0);
 
-            pnl.Controls.Add(flowServices);
+            pnl.Controls.Add(tableServices);
             pnl.Controls.Add(topBar);
 
             return pnl;
@@ -780,15 +799,14 @@ namespace ReprediTrayDaemon
         {
             var tile = new Panel
             {
-                Size = new Size(195, 96),
-                Margin = new Padding(0, 0, 8, 0),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(4, 2, 4, 2),
                 BackColor = Color.Transparent
             };
-            using var reg = GetRoundedRectPath(new Rectangle(0, 0, 195, 96), 14);
-            tile.Region = new Region(reg);
 
             tile.Paint += (s, e) =>
             {
+                if (tile.Width <= 2 || tile.Height <= 2) return;
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using var path = GetRoundedRectPath(new Rectangle(0, 0, tile.Width - 1, tile.Height - 1), 14);
                 Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(25, 34, 54) : Color.FromArgb(241, 245, 249);
@@ -799,66 +817,91 @@ namespace ReprediTrayDaemon
                 e.Graphics.DrawPath(pen, path);
             };
 
+            // Badge dedicado para el icono (evita todo solapamiento con el texto)
+            var pnlIconBadge = new Panel
+            {
+                Size = new Size(36, 36),
+                Location = new Point(10, 10),
+                BackColor = Color.Transparent
+            };
+            using var regBadge = GetRoundedRectPath(new Rectangle(0, 0, 36, 36), 10);
+            pnlIconBadge.Region = new Region(regBadge);
+            pnlIconBadge.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var p = GetRoundedRectPath(new Rectangle(0, 0, pnlIconBadge.Width - 1, pnlIconBadge.Height - 1), 10);
+                Color bgIcon = currentTheme == "Oscuro" ? Color.FromArgb(36, 48, 72) : Color.FromArgb(226, 232, 240);
+                using var br = new SolidBrush(bgIcon);
+                e.Graphics.FillPath(br, p);
+            };
+
             var lblIcon = new Label
             {
                 Text = emoji,
-                Font = new Font("Segoe UI Emoji", 14F),
-                Location = new Point(8, 8),
-                AutoSize = true,
+                Font = new Font("Segoe UI Emoji", 13F),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
                 BackColor = Color.Transparent
             };
+            pnlIconBadge.Controls.Add(lblIcon);
 
+            // Título: empieza a la derecha del badge (X = 52), con margen de seguridad absoluto
             var lblTitle = new Label
             {
                 Text = title,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Location = new Point(38, 8),
-                Size = new Size(150, 18),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Location = new Point(52, 9),
+                Size = new Size(130, 18),
                 ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42),
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                AutoEllipsis = true
             };
 
+            // Subtítulo: debajo del título, X = 52
             var lblSub = new Label
             {
                 Text = subtitle,
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
-                Location = new Point(38, 26),
-                Size = new Size(150, 16),
+                Font = new Font("Segoe UI", 8F, FontStyle.Regular),
+                Location = new Point(52, 28),
+                Size = new Size(130, 16),
                 ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139),
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                AutoEllipsis = true
             };
 
-            statusLbl = new Label
+            var localStatusLbl = new Label
             {
                 Text = "Comprobando...",
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                Location = new Point(8, 56),
-                Size = new Size(onToggle != null ? 112 : 178, 28),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Location = new Point(10, 56),
+                Size = new Size(onToggle != null ? 104 : 170, 28),
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.FromArgb(245, 158, 11),
                 BackColor = Color.Transparent
             };
+            statusLbl = localStatusLbl;
 
-            tile.Controls.Add(lblIcon);
+            tile.Controls.Add(pnlIconBadge);
             tile.Controls.Add(lblTitle);
             tile.Controls.Add(lblSub);
-            tile.Controls.Add(statusLbl);
+            tile.Controls.Add(localStatusLbl);
 
+            Button? btn = null;
             if (onToggle != null)
             {
-                var btn = new Button
+                btn = new Button
                 {
-                    Text = "▶️",
+                    Text = "▶️ Iniciar",
                     Font = new Font("Segoe UI Emoji", 8F, FontStyle.Bold),
-                    Location = new Point(126, 56),
-                    Size = new Size(60, 28),
+                    Location = new Point(118, 56),
+                    Size = new Size(72, 28),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand,
                     BackColor = Color.FromArgb(16, 185, 129),
                     ForeColor = Color.White
                 };
                 btn.FlatAppearance.BorderSize = 0;
-                using var pathBtn = GetRoundedRectPath(new Rectangle(0, 0, 60, 28), 8);
+                using var pathBtn = GetRoundedRectPath(new Rectangle(0, 0, 72, 28), 8);
                 btn.Region = new Region(pathBtn);
 
                 btn.Click += async (s, e) =>
@@ -880,7 +923,101 @@ namespace ReprediTrayDaemon
                 toggleBtn = null;
             }
 
+            // Adaptación responsiva al ancho de cada tile dentro del grid
+            tile.SizeChanged += (s, e) =>
+            {
+                if (tile.Width <= 2 || tile.Height <= 2) return;
+                using var reg = GetRoundedRectPath(new Rectangle(0, 0, tile.Width, tile.Height), 14);
+                tile.Region = new Region(reg);
+
+                int textW = Math.Max(tile.Width - 58, 60);
+                lblTitle.Width = textW;
+                lblSub.Width = textW;
+
+                if (btn != null)
+                {
+                    btn.Location = new Point(tile.Width - btn.Width - 10, 56);
+                    localStatusLbl.Width = Math.Max(btn.Left - localStatusLbl.Left - 4, 50);
+                }
+                else
+                {
+                    localStatusLbl.Width = Math.Max(tile.Width - 20, 60);
+                }
+                tile.Invalidate();
+            };
+
             return tile;
+        }
+
+        private void UpdateResponsiveLayout()
+        {
+            if (pnlMainContent == null || pnlHeader == null) return;
+
+            // Ancho útil disponible en el contenedor con scroll
+            int availWidth = pnlMainContent.ClientSize.Width - pnlMainContent.Padding.Horizontal - 4;
+            int contentWidth = Math.Max(availWidth, 940);
+
+            // 1. Cabecera
+            pnlHeader.Width = contentWidth;
+            if (pnlOnlineBadge != null)
+            {
+                pnlOnlineBadge.Location = new Point(pnlHeader.Width - pnlOnlineBadge.Width - 10, 11);
+            }
+
+            // 2. Tarjeta de Centro de Control de Servicios
+            pnlServicesCard.Width = contentWidth;
+            if (btnRestartAllServices != null && btnStopAllServices != null && btnStartAllServices != null)
+            {
+                btnRestartAllServices.Location = new Point(pnlServicesCard.Width - btnRestartAllServices.Width - 16, 7);
+                btnStopAllServices.Location = new Point(btnRestartAllServices.Left - btnStopAllServices.Width - 10, 7);
+                btnStartAllServices.Location = new Point(btnStopAllServices.Left - btnStartAllServices.Width - 10, 7);
+            }
+
+            // 3. Conmutador de Modo
+            pnlModeSwitch.Width = contentWidth;
+            if (btnVerPedidos != null)
+            {
+                btnVerPedidos.Location = new Point(pnlModeSwitch.Width - btnVerPedidos.Width - 20, 11);
+            }
+
+            // 4. Diagrama de Pipeline (3 Nodos distribuidos equitativamente)
+            pnlPipelineDiagram.Width = contentWidth;
+            if (cardNodePg != null && cardNodeBridge != null && cardNodeAccess != null)
+            {
+                int nodeW = Math.Min(300, Math.Max(240, (pnlPipelineDiagram.Width - 60) / 3));
+                cardNodePg.Size = new Size(nodeW, 110);
+                cardNodeBridge.Size = new Size(nodeW, 110);
+                cardNodeAccess.Size = new Size(nodeW, 110);
+
+                int remaining = Math.Max(pnlPipelineDiagram.Width - (nodeW * 3), 20);
+                int gap = remaining / 2;
+
+                cardNodePg.Location = new Point(0, 0);
+                cardNodeBridge.Location = new Point(nodeW + gap, 0);
+                cardNodeAccess.Location = new Point(pnlPipelineDiagram.Width - nodeW, 0);
+                pnlPipelineDiagram.Invalidate();
+            }
+
+            // 5. Métricas Grid 4 columnas
+            pnlMetricCards.Width = contentWidth;
+
+            // 6. Sub-métricas
+            flowSubMetrics.Width = contentWidth;
+
+            // 7. Consola en tiempo real
+            pnlLogConsoleCard.Width = contentWidth;
+            if (btnClearLogView != null && chkAutoscroll != null && pnlLogHeader != null)
+            {
+                btnClearLogView.Location = new Point(pnlLogHeader.Width - btnClearLogView.Width - 16, 9);
+                chkAutoscroll.Location = new Point(btnClearLogView.Left - chkAutoscroll.Width - 10, 9);
+            }
+
+            // 8. Barra de estado inferior
+            pnlStatusBar.Width = contentWidth;
+            if (lblFooterStatusBadge != null)
+            {
+                lblFooterStatusBadge.Location = new Point(pnlStatusBar.Width - lblFooterStatusBadge.Width - 16, 8);
+            }
         }
 
         private void ProcessManager_OnServiceStatusChanged(ServiceId id, ServiceStatusModel model)
@@ -1020,8 +1157,19 @@ namespace ReprediTrayDaemon
             using var pathRegion = GetRoundedRectPath(new Rectangle(0, 0, width, height), cornerRadius);
             pnl.Region = new Region(pathRegion);
 
+            pnl.SizeChanged += (s, e) =>
+            {
+                if (pnl.Width > 2 && pnl.Height > 2)
+                {
+                    using var rPath = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width, pnl.Height), cornerRadius);
+                    pnl.Region = new Region(rPath);
+                    pnl.Invalidate();
+                }
+            };
+
             pnl.Paint += (s, e) =>
             {
+                if (pnl.Width <= 2 || pnl.Height <= 2) return;
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), cornerRadius);
                 Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(22, 31, 51) : Color.FromArgb(245, 255, 255, 255);
@@ -1122,7 +1270,7 @@ namespace ReprediTrayDaemon
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            statusLbl = new Label
+            var localStatusLbl = new Label
             {
                 Text = subtitle,
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
@@ -1131,10 +1279,20 @@ namespace ReprediTrayDaemon
                 Location = new Point(10, 84),
                 TextAlign = ContentAlignment.MiddleCenter
             };
+            statusLbl = localStatusLbl;
+
+            pnl.SizeChanged += (s, e) =>
+            {
+                if (pnl.Width <= 2 || pnl.Height <= 2) return;
+                iconBox.Location = new Point((pnl.Width - iconBox.Width) / 2, 10);
+                lblTitle.Width = Math.Max(pnl.Width - 20, 60);
+                localStatusLbl.Width = Math.Max(pnl.Width - 20, 60);
+                pnl.Invalidate();
+            };
 
             pnl.Controls.Add(iconBox);
             pnl.Controls.Add(lblTitle);
-            pnl.Controls.Add(statusLbl);
+            pnl.Controls.Add(localStatusLbl);
 
             iconLbl = iconBox;
             return pnl;
@@ -1143,6 +1301,8 @@ namespace ReprediTrayDaemon
         private Panel CreateMetricCard(string title, string initialVal, out Label valLbl)
         {
             var pnl = CreateRoundedGlassCard(250, 90, 16);
+            pnl.Dock = DockStyle.Fill;
+            pnl.Margin = new Padding(0, 0, 10, 0);
 
             var lblTag = new Label
             {
@@ -1154,7 +1314,7 @@ namespace ReprediTrayDaemon
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            valLbl = new Label
+            var localValLbl = new Label
             {
                 Text = initialVal,
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
@@ -1163,9 +1323,17 @@ namespace ReprediTrayDaemon
                 Location = new Point(10, 36),
                 TextAlign = ContentAlignment.MiddleCenter
             };
+            valLbl = localValLbl;
+
+            pnl.SizeChanged += (s, e) =>
+            {
+                if (pnl.Width <= 2 || pnl.Height <= 2) return;
+                lblTag.Width = Math.Max(pnl.Width - 20, 40);
+                localValLbl.Width = Math.Max(pnl.Width - 20, 40);
+            };
 
             pnl.Controls.Add(lblTag);
-            pnl.Controls.Add(valLbl);
+            pnl.Controls.Add(localValLbl);
 
             return pnl;
         }
@@ -1406,9 +1574,30 @@ namespace ReprediTrayDaemon
             if (lblHeaderSubtitle != null)
                 lblHeaderSubtitle.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
 
-            // Services Card Header
+            // Services Card Header & Tiles
             if (lblServicesTitle != null)
                 lblServicesTitle.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(30, 41, 59);
+
+            if (tableServices != null)
+            {
+                foreach (Control c in tableServices.Controls)
+                {
+                    if (c is Panel t)
+                    {
+                        foreach (Control sc in t.Controls)
+                        {
+                            if (sc is Label l && l != lblSvcPgStatus && l != lblSvcPostgrestStatus && l != lblSvcCaddyStatus && l != lblSvcSyncStatus && l != lblSvcAccessStatus)
+                            {
+                                if (l.Font.Bold)
+                                    l.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42);
+                                else
+                                    l.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
+                            }
+                        }
+                        t.Invalidate();
+                    }
+                }
+            }
 
             // Mode Switch
             if (lblModeTag != null)

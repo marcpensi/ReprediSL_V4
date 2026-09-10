@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
-**Fecha de actualización:** 10-09-2026  
-**Versión:** 4.8.0  
-**Estado General:** Operativo y Desplegado en Producción (Consolidación V4.8.0 - Sincronización Canónica Estricta Access qry*api sin alteración de esquemas, Mapeo Historial/Catálogo/Tarifas, Corrección de Contraste en Modal de Añadir Artículos, Pruebas 5/5 OK y Despliegue en Hostinger)
+**Fecha de actualización:** 11-09-2026  
+**Versión:** 4.8.1  
+**Estado General:** Operativo, Auditado y Desplegado en Producción (Consolidación V4.8.1 - Rediseño de KPIs de Procesos Anti-Solapamiento, Responsividad Integral del Centro de Control WinForms C# .NET 10, Auditoría Técnica Completa, Pruebas 5/5 OK y Despliegue en Hostinger)
 
 ---
 
@@ -32,12 +32,15 @@
 - [x] **Sincronización Canónica Estricta Access `qry*api` (V4.8.0):** Supresión total de rutinas de creación/alteración arbitraria de consultas y campos en Access (`ActualizarEstructuraAccess`). Exportación 100% dinámica de las consultas cuyo nombre comience por `qry` y finalice por `api`. Mapeo canónico a PostgreSQL: `qryuventasapi` $\rightarrow$ `historial`, `qrypreciosapi` $\rightarrow$ `catalogo` (tarifa 1 o configurable), `qrytarifasapi` $\rightarrow$ `tarifas`, y el resto por nombre base (`clientes`, `vendedores`...).
 - [x] **Gestión Local de Pedidos y Filtrado de Historial (V4.8.0):** Los pedidos se crean, persisten y mantienen en el cliente remoto (IndexedDB de la PWA) y se transmiten a la API mediante HTTP POST. La consulta de historial en la PWA se filtra en tiempo real por el código del cliente seleccionado.
 - [x] **Corrección de Visibilidad UI en Modal de Artículos (V4.8.0):** Solucionado el problema de contraste en el botón «Aceptar» de la ventana modal de añadir artículos (`AddModal`), estableciendo estilos de alta especificidad para estado normal y deshabilitado.
-- [x] **Auditoría, Despliegue en Hostinger y Tag v4.8.0:** Pruebas unitarias automatizadas 5/5 superadas, paquete frontend compilado con Vite y desplegado a producción en `https://pedidos.repredisl.com`.
+- [x] **Rediseño de KPIs de Procesos Anti-Solapamiento (V4.8.1):** Rediseño visual de las 5 tarjetas de control de servicios (`PostgreSQL`, `PostgREST API`, `Caddy Proxy`, `Sync Pedidos`, `Access ERP`) con contenedores de iconos independientes (`36x36px`), títulos y subtítulos con desplazamiento seguro (`X = 52px`) para eliminar todo recorte o solapamiento, y botones de control de 72px («⏹️ Parar», «▶️ Iniciar») completamente legibles.
+- [x] **Responsividad Total del Centro de Control C# WinForms (V4.8.1):** Implementación de cuadrícula `TableLayoutPanel` (5 columnas proporcionales del 20%) y controlador de eventos `UpdateResponsiveLayout` para escalado dinámico de los 8 contenedores principales ante cualquier ancho de pantalla o redimensionamiento de ventana.
+- [x] **Auditoría Integral del Proyecto (V4.8.1):** Elaboración del informe técnico oficial [`AUDITORIA_V4.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/AUDITORIA_V4.md) documentando qué hace el proyecto, qué no hace y los objetivos conseguidos.
 
 ---
 
 ## 3. Documentación Histórica y Detallada
 
+- **Auditoría Integral V4:** [`AUDITORIA_V4.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/AUDITORIA_V4.md)
 - Auditoría Inicial: [ESTADO_INICIAL.md](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/00_EstadoProyecto/ESTADO_INICIAL.md)
 - Roadmap de Evolución: [ROADMAP_V3.md](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/00_EstadoProyecto/ROADMAP_V3.md)
 - Estado de Fases: [PENDIENTES_V3.md](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/00_EstadoProyecto/PENDIENTES_V3.md)

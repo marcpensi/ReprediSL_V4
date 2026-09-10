@@ -5,6 +5,7 @@ Este directorio contiene la documentación técnica y funcional oficial del proy
 - [`PROJECT_CONTEXT.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/PROJECT_CONTEXT.md): Contexto general, pila tecnológica y metadatos estables.
 - [`HISTORIAL_TECNICO.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/HISTORIAL_TECNICO.md): Registro cronológico de cambios técnicos e infraestructura.
 - [`00_EstadoProyecto.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/00_EstadoProyecto.md): Estado actual del proyecto, hitos alcanzados y documentación histórica V3.
+- [`AUDITORIA_V4.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/AUDITORIA_V4.md): Auditoría integral V4.8.1 (qué hace, qué no hace y objetivos conseguidos).
 - [`01_Arquitectura.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/01_Arquitectura.md): Arquitectura Offline-First, desacoplamiento Frontend/API y diagramas.
 - [`02_Funcional.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/02_Funcional.md): Módulos comerciales (Clientes, Pedidos, PDF, Caché).
 - [`03_Datos.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/03_Datos.md): Esquema de tablas en PostgreSQL y base de datos local IndexedDB.
