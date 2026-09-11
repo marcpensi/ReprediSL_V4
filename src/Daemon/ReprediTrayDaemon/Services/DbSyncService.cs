@@ -33,13 +33,20 @@ namespace ReprediTrayDaemon.Services
             Success
         }
 
-        public DbSyncService(string projectRoot)
-        {
-            ProjectRoot = ResolveFallbackProjectRoot(projectRoot);
-            ProgressLogPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
-            AltProgressLogPath = Path.Combine(ProjectRoot, "src", "Access", "E0012026", "sync_progress.log");
-            ErrorLogPath = Path.Combine(ProjectRoot, "src", "Access", "sync_errors.log");
+        public DaemonConfig Config { get; }
 
+        public DbSyncService(string projectRoot) : this(DaemonConfig.Load() ?? new DaemonConfig { BaseDir = projectRoot }) { }
+
+        public DbSyncService(DaemonConfig config)
+        {
+            Config = config;
+            ProjectRoot = ResolveFallbackProjectRoot(config.BaseDir);
+            string logsDir = config.ResolveFullPath(config.LogsDir);
+            ProgressLogPath = Path.Combine(logsDir, "sync_progress.log");
+            AltProgressLogPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
+            ErrorLogPath = Path.Combine(logsDir, "sync_errors.log");
+
+            MdbPath = config.AccessMdbPath;
             ResolveMdbPath();
             InitLogOffsets();
         }
@@ -98,6 +105,12 @@ namespace ReprediTrayDaemon.Services
 
         public string ResolveMdbPath()
         {
+            if (!string.IsNullOrEmpty(Config.AccessMdbPath) && File.Exists(Config.AccessMdbPath))
+            {
+                MdbPath = Config.AccessMdbPath;
+                return MdbPath;
+            }
+
             string[] candidates = new string[]
             {
                 @"C:\pensi\psgestw\e0012026\gestion.mdb",

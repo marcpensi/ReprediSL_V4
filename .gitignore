@@ -20,3 +20,8 @@ backups/
 # El esquema se exporta en Documentacion/SCHEMA_ACCESS.md
 *.mdb
 *.accdb
+
+# Paquetes generados y artefactos de despliegue
+dist_cliente/
+Staging/
+archivos.txt

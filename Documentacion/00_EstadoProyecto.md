@@ -40,6 +40,30 @@
   - Recálculo dinámico e instantáneo del último número de pedido al cambiar la serie o el vendedor en la configuración, consultando el máximo real entre `pedidos_nuevos`, `pedidos` y los pedidos locales pendientes en IndexedDB.
   - Protección estricta de pedidos sincronizados con central/psgestw: se presentan con distintivo `🔒 Pedido sincronizado con central (Histórico · Solo lectura)`, quedan completamente bloqueados contra modificaciones y se excluyen de forma permanente de cualquier proceso de re-sincronización.
   - Despliegue en producción completado con éxito en Hostinger (`pedidos.repredisl.com`) y PostgREST activo en `api.repredisl.com`.
+- [x] **Favicon Oficial, Iconos KPI con Color de Marca y Corrección de Ventana de Errores (V4.9.1):**
+  - **Favicon oficial de Repredi:** Integrado en el ejecutable (`ApplicationIcon`), barra de título de la ventana principal (`this.Icon`), icono en la bandeja de sistema junto al reloj (`trayIcon.Icon`), cabecera superior (`PictureBox` 40x40px) y modales secundarios (`pedForm.Icon`, `errForm.Icon`).
+  - **Iconos de KPIs con identidad cromática:** Eliminada la renderización monótona en negro en ambos temas (Oscuro/Claro). Cada servicio cuenta con su paleta de color semántica en glifos e insignias con tintes translúcidos y bordes de acento (PostgreSQL en azul cielo, PostgREST en ámbar, Caddy en esmeralda, Sync en violeta y Access ERP en rosa coral).
+  - **Espaciado anti-amontonamiento:** Separación limpia de 8px entre insignia y textos (`X = 58px`), 4px entre título y subtítulo (`Y = 12` y `Y = 33`), anchos dinámicos con `SizeChanged` y botón de control alineado a la derecha en `Y = 66`.
+  - **Corrección de la Ventana de Errores:** Título formalizado exactamente a «`ReprediSL - Errores de Sincronización`» tanto en la barra de título (`Form.Text`) como en la cabecera interior (`lblTitleErr`), eliminando glifos monocromáticos y organizando la información con estado semántico claro y botón de limpieza de log.
+- [x] **Plantilla Oficial de Pedido en PDF Idéntica a Factura con Vendedor (V4.9.2):**
+  - Maquetación A4 milimétrica inspirada y calcada de la factura oficial física de Repredi SL.
+  - **Cabecera corporativa izquierda:** Inserción del logotipo oficial en color en alta resolución (`reprediLogoBase64.js`), razón social *Representaciones y Distribuciones, S. L.*, dirección fiscal (`Avda. Hnos. Bou Km. 2`), teléfonos (`964 22 74 00 / Fax 964 22 08 05`), código postal `12003 - CASTELLÓN`, CIF `B-12043303`, y título destacado «`PEDIDO`».
+  - **Cabecera de metadatos derecha:** Tabla estructurada con 4 columnas exactas: `Número` | `Fecha` | `Vendedor` | `N.I.F.`, incorporando el comercial asignado (código y nombre del vendedor).
+  - **Caja de cliente:** Recuadro con trazo sólido negro con razón social, dirección de entrega/fiscal, código postal, población y nombre comercial.
+  - **Tabla de artículos:** Encabezados con fondo gris con `Artículo` | `Descripción` | `Unidades` | `Precio` | `Dto` | `Importe`, formato numérico en castellano (`1.234,56 €`) y paginación automática.
+  - **Bloque inferior:** Cuadro izquierdo de `Forma de Pago` / `Vencimiento` / `Domiciliación` bancaria, y cuadro derecho con desglose de `Base Imponible`, `% Iva` e `Importe Iva`, finalizando en la celda destacada `Total Pedido`.
+  - **Pie legal LOPD:** Cláusula oficial íntegra conforme a la Ley Orgánica de Protección de Datos en pie de página.
+- [x] **Paquete de Instalación Oficial en Cliente `C:\pensi\psforce\` (V4.9.3):**
+  - Estructuración y generación automática del paquete oficial para clientes:
+    - `ReprediTrayDaemon\`: `ReprediTrayDaemon.exe` (.NET 10 WinForms), DLLs, `config.json`, `postgrest.exe` y `postgrest.conf`.
+    - `Sync\`: `sincronizador.exe` (.NET 10 Console compilado y verificado), `config.json`, script canónico `SincronizarPedidosEntrantes.ps1` y lanzador `ARRANCAR_SINCRONIZADOR.bat`.
+    - `Caddy\`: `caddy.exe` binario, `Caddyfile` (SSL proxy) y lanzador `ARRANCAR_CADDY.bat`.
+    - `Logs\`: Registro automático de `sync_progress.log` y `sync_errors.log`.
+    - `Backup\`: Directorio de seguridad con script `HACER_BACKUP_ACCESS.bat` para snapshots fechados de `gestion.mdb`.
+    - Raíz: `INICIAR_TODO.bat`, `DETENER_TODO.bat`, `CREAR_ACCESOS_DIRECTOS.bat` y `LEEME_INSTALACION.txt`.
+  - Soporte de configuración desacoplada vía `DaemonConfig.cs` en `ReprediTrayDaemon` y `SyncConfig` en `sincronizador.exe`.
+  - Automatización con [`PrepararInstalacionCliente.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PrepararInstalacionCliente.ps1), desplegando simultáneamente en `C:\pensi\psforce\` y en el paquete portable [`dist_cliente\ReprediSL\`](file:///d:/programacio/repredi/ReprediSL_V4/dist_cliente/ReprediSL).
+  - Documentación detallada en [`MANUAL_INSTALACION_CLIENTE.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/MANUAL_INSTALACION_CLIENTE.md).
 
 ---
 

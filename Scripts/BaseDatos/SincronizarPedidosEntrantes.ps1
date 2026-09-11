@@ -1,37 +1,84 @@
-param (
+﻿param (
     [switch]$Loop = $false,
     [int]$IntervaloSegundos = 3
 )
 
 $ErrorActionPreference = "Stop"
 
+# PostgreSQL PsForce
+$env:PGUSER = "postgres"
+$env:PGHOST = "localhost"
+$env:PGPORT = "5433"
+$env:PGDBAPI = "repredi-api"
+$env:PGCLIENTENCODING = "UTF8"
+
+$env:PGPASSWORD = $env:PGREPREAPIPWD # psql/libpq solo reconoce PGPASSWORD
+
+# Consola UTF-8
+[Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
+
 $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) {
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 }
-$ProjectRoot = (Get-Item (Join-Path $ScriptDir "..\..")).FullName
-$logPath = Join-Path $ProjectRoot "src\Access\sync_progress.log"
+$ProjectRoot = "C:\Pensi\PsForce"
+
+# Carpeta centralizada de logs PsForce
+$logPath = Join-Path $ProjectRoot "Logs"
+if (-not (Test-Path -LiteralPath $logPath)) {
+    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+}
+
+$logSyncFile       = Join-Path $logPath "sync_progress.log"
+$logErrorsFile     = Join-Path $logPath "errors.log"
+$logPendientesFile = Join-Path $logPath "pedidos_pendientes.log"
+$logDescartadosFile = Join-Path $logPath "pedidos_descartados.log"
+
+# PostgreSQL PsForce
+$Psql = "C:\Program Files\PostgreSQL\17\bin\psql.exe"
+if (-not (Test-Path -LiteralPath $Psql)) {
+    throw "No se encuentra PostgreSQL 17: $Psql"
+}
 
 $pathMdb = "C:\PENSI\PSGESTW\E0012026\gestion.mdb"
 if (-not (Test-Path -LiteralPath $pathMdb)) {
-    $pathMdb = Join-Path $ProjectRoot "src\Access\E0012026\gestion.mdb"
+    $pathMdb = Join-Path $ProjectRoot "Test\E0012026\gestion.mdb"
 }
 if (-not (Test-Path -LiteralPath $pathMdb)) {
-    $pathMdb = Join-Path $ProjectRoot "src\Access\gestion.mdb"
+    $pathMdb = Join-Path $ProjectRoot "Test\gestion.mdb"
+}
+
+function Write-LogFile([string]$FilePath, [string]$Message) {
+    try {
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        $line = "[$timestamp] $Message"
+        $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+        [System.IO.File]::AppendAllText($FilePath, "$line`r`n", $utf8Bom)
+    }
+    catch {
+        Write-Warning "No se pudo escribir en el registro '$FilePath': $($_.Exception.Message)"
+    }
 }
 
 function Log-Sync([string]$Message) {
     $timestamp = (Get-Date).ToString("HH:mm:ss")
     $line = "[$timestamp] $Message"
     Write-Host $line
+    Write-LogFile $logSyncFile $Message
+}
 
-    try {
-        $utf8Bom = New-Object System.Text.UTF8Encoding($true)
-        [System.IO.File]::AppendAllText($logPath, "$line`r`n", $utf8Bom)
-    }
-    catch {
-        Write-Warning "No se pudo escribir en el registro: $($_.Exception.Message)"
-    }
+function Log-Error([string]$Message) {
+    Write-LogFile $logErrorsFile $Message
+}
+
+function Log-Pendiente([string]$Message) {
+    Write-LogFile $logPendientesFile $Message
+}
+
+function Log-Descartado([string]$Message) {
+    Write-LogFile $logDescartadosFile $Message
 }
 
 function Convertir-Decimal([object]$Value, [double]$DefaultValue = 0.0) {
@@ -121,7 +168,7 @@ WHERE estado = 'N' AND synced_at IS NULL
 ORDER BY id ASC;
 "@
 
-    $rows = & psql -X -v ON_ERROR_STOP=1 -U postgres -d repredisl_api `
+    $rows = & $Psql -X -v ON_ERROR_STOP=1 -h $env:PGHOST -p $env:PGPORT -U postgres -d repredisl_api `
         -t -A -F "`t" -c $sqlSelect
 
     if ($LASTEXITCODE -ne 0) {
@@ -142,6 +189,8 @@ ORDER BY id ASC;
             $fields = $row.Split("`t")
             if ($fields.Length -lt 14) {
                 Log-Sync "[ERROR] PostgreSQL devolvió una fila incompleta; no se procesa."
+                Log-Error "PostgreSQL devolvió una fila incompleta; no se procesa."
+                Log-Descartado "Fila PostgreSQL incompleta. Contenido: $row"
                 continue
             }
 
@@ -158,6 +207,7 @@ ORDER BY id ASC;
 
             if ($items.Count -eq 0) {
                 Log-Sync "[ERROR] Pedido $serie-$numPedido sin líneas; permanece pendiente."
+                Log-Pendiente "Pedido $serie-$numPedido sin líneas; permanece pendiente."
                 continue
             }
 
@@ -245,12 +295,13 @@ ORDER BY id ASC;
                 if ($yaExiste) {
                     $cn.RollbackTrans() | Out-Null
                     Log-Sync "[INFO] El pedido $serie-$numPedido ya existe en PedVentas (Access). Marcando como sincronizado en PostgreSQL para evitar duplicados."
+                    Log-Descartado "Pedido $serie-$numPedido ya existía en Access; marcado como sincronizado en PostgreSQL para evitar duplicado."
                     $sqlUpdateYaExiste = @"
 UPDATE public.pedidos_nuevos
 SET estado = 'S', synced_at = NOW()
 WHERE id = $idPg AND estado = 'N';
 "@
-                    & psql -X -v ON_ERROR_STOP=1 -U postgres -d repredisl_api `
+                    & $Psql -X -v ON_ERROR_STOP=1 -h $env:PGHOST -p $env:PGPORT -U postgres -d repredisl_api `
                         -c $sqlUpdateYaExiste | Out-Null
                     $count++
                     continue
@@ -335,6 +386,8 @@ VALUES
             catch {
                 try { $cn.RollbackTrans() | Out-Null } catch {}
                 Log-Sync "[ERROR] Pedido $serie-$numPedido no insertado en Access: $($_.Exception.Message)"
+                Log-Error "Pedido $serie-$numPedido no insertado en Access: $($_.Exception.Message)"
+                Log-Pendiente "Pedido $serie-$numPedido sigue pendiente por error de inserción en Access."
                 continue
             }
 
@@ -344,11 +397,13 @@ SET estado = 'S', synced_at = NOW()
 WHERE id = $idPg AND estado = 'N' AND synced_at IS NULL;
 "@
 
-            & psql -X -v ON_ERROR_STOP=1 -U postgres -d repredisl_api `
+            & $Psql -X -v ON_ERROR_STOP=1 -h $env:PGHOST -p $env:PGPORT -U postgres -d repredisl_api `
                 -c $sqlUpdate | Out-Null
 
             if ($LASTEXITCODE -ne 0) {
                 Log-Sync "[ERROR] $serie-$numPedido está en Access, pero no se pudo actualizar PostgreSQL."
+                Log-Error "$serie-$numPedido está en Access, pero no se pudo actualizar PostgreSQL."
+                Log-Pendiente "$serie-$numPedido requiere revisión: insertado en Access pero PostgreSQL no se actualizó."
                 continue
             }
 
@@ -374,6 +429,7 @@ if ($Loop) {
         }
         catch {
             Log-Sync "[ERROR] $($_.Exception.Message)"
+            Log-Error "$($_.Exception.Message)"
         }
 
         Start-Sleep -Seconds $IntervaloSegundos
@@ -386,6 +442,7 @@ else {
     }
     catch {
         Log-Sync "[ERROR] $($_.Exception.Message)"
+        Log-Error "$($_.Exception.Message)"
         exit 1
     }
 }

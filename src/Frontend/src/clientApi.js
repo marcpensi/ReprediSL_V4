@@ -140,19 +140,27 @@ export async function syncCachedClientsApi(codes, { signal } = {}) {
 
 // --- Productos ---
 export function normalizeProduct(row) {
-  const code = String(apiValue(row, 'codigo', 'id_producto', 'code', 'id') ?? '').trim();
-  const name = String(apiValue(row, 'descripcion', 'nombre', 'name') ?? '').trim();
+  const rawCode = apiValue(row, 'codigo', 'id_producto', 'code', 'id');
+  const code = (rawCode !== null && rawCode !== undefined && String(rawCode).trim() !== '')
+    ? String(rawCode).trim()
+    : 'PROD_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+
+  const rawName = apiValue(row, 'descripcion', 'nombre', 'name');
+  const name = (rawName !== null && rawName !== undefined && String(rawName).trim() !== '')
+    ? String(rawName).trim()
+    : `Producto ${code}`;
+
   const priceVal = apiValue(row, 'precio_venta', 'precio', 'price');
-  const price = (priceVal !== '' && priceVal !== null && priceVal !== undefined && !isNaN(Number(priceVal))) ? Number(priceVal) : null;
+  const price = (priceVal !== '' && priceVal !== null && priceVal !== undefined && !isNaN(Number(priceVal))) ? Number(priceVal) : 0;
   const boxVal = apiValue(row, 'unidades_caja', 'caja', 'box');
-  const box = (boxVal !== '' && boxVal !== null && boxVal !== undefined && !isNaN(Number(boxVal)) && Number(boxVal) > 0) ? Number(boxVal) : null;
+  const box = (boxVal !== '' && boxVal !== null && boxVal !== undefined && !isNaN(Number(boxVal)) && Number(boxVal) > 0) ? Number(boxVal) : 24;
   const stockVal = apiValue(row, 'existencias', 'stock');
-  const stock = (stockVal !== '' && stockVal !== null && stockVal !== undefined && !isNaN(Number(stockVal))) ? Number(stockVal) : null;
+  const stock = (stockVal !== '' && stockVal !== null && stockVal !== undefined && !isNaN(Number(stockVal))) ? Number(stockVal) : 100;
   const tarifaId = apiValue(row, 'id_tarifa', 'tarifa');
 
   return {
     code,
-    name: name || (code ? `Producto ${code}` : ''),
+    name,
     price,
     box,
     stock,

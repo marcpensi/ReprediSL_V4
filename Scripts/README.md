@@ -78,3 +78,7 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 ### 14. [`AplicarV47.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Migracion/AplicarV47.ps1)
 - **Objetivo:** Script de migración y aplicación de componentes v4.7.0 (`Catalogo.jsx`, `NuevoPedido.jsx` y estilos CSS) con respaldo automático previo.
 
+### 15. [`PrepararInstalacionCliente.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PrepararInstalacionCliente.ps1)
+- **Objetivo:** Automatiza la compilación en modo Release de `ReprediTrayDaemon` y `sincronizador.exe`, empaquetando y generando la estructura oficial del cliente en `C:\pensi\psforce\` y el paquete portable en `dist_cliente\ReprediSL\`. Incluye ejecutables, DLLs, configuraciones (`config.json`), binarios de Caddy/PostgREST, carpetas de Logs y Backup, y scripts de arranque y creación de accesos directos.
+
+

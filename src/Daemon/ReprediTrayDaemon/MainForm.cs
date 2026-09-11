@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -162,14 +162,19 @@ namespace ReprediTrayDaemon
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
 
-            string projectRoot = ResolveProjectRoot();
+            var config = DaemonConfig.Load();
+            string projectRoot = config.BaseDir;
             settingsFilePath = Path.Combine(projectRoot, "src", "Access", "ui_settings.json");
+            if (!File.Exists(settingsFilePath))
+            {
+                settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ui_settings.json");
+            }
 
-            processManager = new ProcessManagerService(projectRoot);
+            processManager = new ProcessManagerService(config);
             processManager.OnServiceStatusChanged += ProcessManager_OnServiceStatusChanged;
             processManager.OnProcessOutput += ProcessManager_OnProcessOutput;
 
-            syncService = new DbSyncService(projectRoot);
+            syncService = new DbSyncService(config);
             syncService.OnLogMessage += SyncService_OnLogMessage;
             syncService.OnErrorThresholdExceeded += SyncService_OnErrorThresholdExceeded;
 
@@ -218,7 +223,27 @@ namespace ReprediTrayDaemon
             this.MinimumSize = new Size(1000, 780);
             this.Size = new Size(1140, 920);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Icon = SystemIcons.Application;
+            try
+            {
+                string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "favicon.ico");
+                if (!File.Exists(iconPath))
+                {
+                    string alt = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Media", "favicon.ico"));
+                    if (File.Exists(alt)) iconPath = alt;
+                }
+                if (File.Exists(iconPath))
+                {
+                    this.Icon = new Icon(iconPath);
+                }
+                else
+                {
+                    this.Icon = SystemIcons.Application;
+                }
+            }
+            catch
+            {
+                this.Icon = SystemIcons.Application;
+            }
 
             // Container principal vertical
             pnlMainContent = new FlowLayoutPanel
@@ -242,13 +267,35 @@ namespace ReprediTrayDaemon
             };
             pnlHeader.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); } };
 
-            var picDbIcon = new Label
+            Control picHeaderLogo;
+            string pngLogoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "favicon.png");
+            if (!File.Exists(pngLogoPath))
             {
-                Text = "⚡",
-                Font = new Font("Segoe UI Emoji", 20F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(4, 6)
-            };
+                string altPng = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Media", "favicon.png"));
+                if (File.Exists(altPng)) pngLogoPath = altPng;
+            }
+
+            if (File.Exists(pngLogoPath))
+            {
+                picHeaderLogo = new PictureBox
+                {
+                    Image = Image.FromFile(pngLogoPath),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Size = new Size(40, 40),
+                    Location = new Point(4, 6),
+                    BackColor = Color.Transparent
+                };
+            }
+            else
+            {
+                picHeaderLogo = new Label
+                {
+                    Text = "⚡",
+                    Font = new Font("Segoe UI Emoji", 20F, FontStyle.Bold),
+                    AutoSize = true,
+                    Location = new Point(4, 6)
+                };
+            }
 
             lblHeaderTitle = new Label
             {
@@ -274,7 +321,7 @@ namespace ReprediTrayDaemon
             pnlOnlineBadge.Location = new Point(880, 8);
             pnlOnlineBadge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 
-            pnlHeader.Controls.Add(picDbIcon);
+            pnlHeader.Controls.Add(picHeaderLogo);
             pnlHeader.Controls.Add(lblHeaderTitle);
             pnlHeader.Controls.Add(lblHeaderSubtitle);
             pnlHeader.Controls.Add(pnlOnlineBadge);
@@ -642,9 +689,9 @@ namespace ReprediTrayDaemon
 
             trayIcon = new NotifyIcon
             {
-                Icon = SystemIcons.Application,
+                Icon = this.Icon ?? SystemIcons.Application,
                 ContextMenuStrip = trayMenu,
-                Text = "ReprediSL V4 - Centro de Control",
+                Text = "ReprediSL V4 · Centro de Control",
                 Visible = true
             };
             trayIcon.DoubleClick += (s, e) => ShowForm();
@@ -794,6 +841,22 @@ namespace ReprediTrayDaemon
             return pnl;
         }
 
+        private (Color darkFg, Color lightFg, Color darkBg, Color lightBg) GetServiceThemePalette(string title)
+        {
+            if (title.Contains("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+                return (Color.FromArgb(56, 189, 248), Color.FromArgb(2, 132, 199), Color.FromArgb(20, 38, 64), Color.FromArgb(224, 242, 254));
+            if (title.Contains("PostgREST", StringComparison.OrdinalIgnoreCase))
+                return (Color.FromArgb(251, 191, 36), Color.FromArgb(217, 119, 6), Color.FromArgb(48, 36, 16), Color.FromArgb(254, 243, 199));
+            if (title.Contains("Caddy", StringComparison.OrdinalIgnoreCase))
+                return (Color.FromArgb(52, 211, 153), Color.FromArgb(5, 150, 105), Color.FromArgb(16, 44, 32), Color.FromArgb(209, 250, 229));
+            if (title.Contains("Sync", StringComparison.OrdinalIgnoreCase))
+                return (Color.FromArgb(192, 132, 252), Color.FromArgb(124, 58, 237), Color.FromArgb(38, 24, 58), Color.FromArgb(243, 232, 255));
+            if (title.Contains("Access", StringComparison.OrdinalIgnoreCase))
+                return (Color.FromArgb(251, 113, 133), Color.FromArgb(225, 29, 72), Color.FromArgb(46, 20, 28), Color.FromArgb(255, 228, 230));
+
+            return (Color.FromArgb(96, 165, 250), Color.FromArgb(37, 99, 235), Color.FromArgb(30, 41, 59), Color.FromArgb(226, 232, 240));
+        }
+
         private Panel CreateSingleServiceTile(string emoji, string title, string subtitle,
             out Label statusLbl, out Button? toggleBtn, Func<Task>? onToggle)
         {
@@ -817,53 +880,58 @@ namespace ReprediTrayDaemon
                 e.Graphics.DrawPath(pen, path);
             };
 
-            // Badge dedicado para el icono (evita todo solapamiento con el texto)
+            // Badge dedicado para el icono (evita todo solapamiento con el texto y garantiza color vibrante en ambos temas)
             var pnlIconBadge = new Panel
             {
-                Size = new Size(36, 36),
-                Location = new Point(10, 10),
+                Size = new Size(38, 38),
+                Location = new Point(12, 12),
                 BackColor = Color.Transparent
             };
-            using var regBadge = GetRoundedRectPath(new Rectangle(0, 0, 36, 36), 10);
+            using var regBadge = GetRoundedRectPath(new Rectangle(0, 0, 38, 38), 10);
             pnlIconBadge.Region = new Region(regBadge);
             pnlIconBadge.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 using var p = GetRoundedRectPath(new Rectangle(0, 0, pnlIconBadge.Width - 1, pnlIconBadge.Height - 1), 10);
-                Color bgIcon = currentTheme == "Oscuro" ? Color.FromArgb(36, 48, 72) : Color.FromArgb(226, 232, 240);
-                using var br = new SolidBrush(bgIcon);
-                e.Graphics.FillPath(br, p);
+                var pal = GetServiceThemePalette(title);
+                Color bgIcon = currentTheme == "Oscuro" ? pal.darkBg : pal.lightBg;
+                Color fgIcon = currentTheme == "Oscuro" ? pal.darkFg : pal.lightFg;
+                using var brBg = new SolidBrush(bgIcon);
+                e.Graphics.FillPath(brBg, p);
+                using var penBorder = new Pen(Color.FromArgb(currentTheme == "Oscuro" ? 80 : 130, fgIcon), 1.2f);
+                e.Graphics.DrawPath(penBorder, p);
+
+                // Dibujar el icono/emoji con su color semántico de marca (nunca negro en ningún tema)
+                using var brIcon = new SolidBrush(fgIcon);
+                using var fontIcon = new Font("Segoe UI Emoji", 14F, FontStyle.Bold);
+                var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                e.Graphics.DrawString(emoji, fontIcon, brIcon, new RectangleF(0, 1, pnlIconBadge.Width, pnlIconBadge.Height), sf);
             };
 
-            var lblIcon = new Label
-            {
-                Text = emoji,
-                Font = new Font("Segoe UI Emoji", 13F),
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                BackColor = Color.Transparent
-            };
-            pnlIconBadge.Controls.Add(lblIcon);
-
-            // Título: empieza a la derecha del badge (X = 52), con margen de seguridad absoluto
+            // Título: empieza a la derecha del badge (X = 58), con margen holgado de 8px
             var lblTitle = new Label
             {
                 Text = title,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Location = new Point(52, 9),
-                Size = new Size(130, 18),
+                Location = new Point(58, 12),
+                Size = new Size(120, 18),
                 ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42),
                 BackColor = Color.Transparent,
                 AutoEllipsis = true
             };
 
-            // Subtítulo: debajo del título, X = 52
+            // Subtítulo: debajo del título con separación limpia y clara (Y = 33)
             var lblSub = new Label
             {
                 Text = subtitle,
                 Font = new Font("Segoe UI", 8F, FontStyle.Regular),
-                Location = new Point(52, 28),
-                Size = new Size(130, 16),
+                Location = new Point(58, 33),
+                Size = new Size(120, 16),
                 ForeColor = currentTheme == "Oscuro" ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139),
                 BackColor = Color.Transparent,
                 AutoEllipsis = true
@@ -873,8 +941,8 @@ namespace ReprediTrayDaemon
             {
                 Text = "Comprobando...",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Location = new Point(10, 56),
-                Size = new Size(onToggle != null ? 104 : 170, 28),
+                Location = new Point(12, 66),
+                Size = new Size(onToggle != null ? 95 : 160, 28),
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.FromArgb(245, 158, 11),
                 BackColor = Color.Transparent
@@ -893,7 +961,7 @@ namespace ReprediTrayDaemon
                 {
                     Text = "▶️ Iniciar",
                     Font = new Font("Segoe UI Emoji", 8F, FontStyle.Bold),
-                    Location = new Point(118, 56),
+                    Location = new Point(114, 66),
                     Size = new Size(72, 28),
                     FlatStyle = FlatStyle.Flat,
                     Cursor = Cursors.Hand,
@@ -930,19 +998,20 @@ namespace ReprediTrayDaemon
                 using var reg = GetRoundedRectPath(new Rectangle(0, 0, tile.Width, tile.Height), 14);
                 tile.Region = new Region(reg);
 
-                int textW = Math.Max(tile.Width - 58, 60);
+                int textW = Math.Max(tile.Width - 68, 50);
                 lblTitle.Width = textW;
                 lblSub.Width = textW;
 
                 if (btn != null)
                 {
-                    btn.Location = new Point(tile.Width - btn.Width - 10, 56);
+                    btn.Location = new Point(tile.Width - btn.Width - 10, 66);
                     localStatusLbl.Width = Math.Max(btn.Left - localStatusLbl.Left - 4, 50);
                 }
                 else
                 {
-                    localStatusLbl.Width = Math.Max(tile.Width - 20, 60);
+                    localStatusLbl.Width = Math.Max(tile.Width - 24, 60);
                 }
+                pnlIconBadge.Invalidate();
                 tile.Invalidate();
             };
 
@@ -1243,20 +1312,23 @@ namespace ReprediTrayDaemon
             iconBox.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 using var path = GetRoundedRectPath(new Rectangle(0, 0, iconBox.Width - 1, iconBox.Height - 1), 14);
-                // Parpadeo naranja cuando el nodo recibió actividad en los últimos 3 segundos
                 bool active = isActive() && blinkState;
+                var pal = GetServiceThemePalette(title);
+                Color fgNode = currentTheme == "Oscuro" ? pal.darkFg : pal.lightFg;
                 Color bgColor = currentTheme == "Oscuro"
-                    ? (active ? Color.FromArgb(100, 48, 8) : Color.FromArgb(30, 41, 59))
-                    : (active ? Color.FromArgb(255, 200, 100) : Color.FromArgb(238, 242, 255));
+                    ? (active ? Color.FromArgb(100, 48, 8) : pal.darkBg)
+                    : (active ? Color.FromArgb(255, 200, 100) : pal.lightBg);
                 using var brush = new SolidBrush(bgColor);
                 e.Graphics.FillPath(brush, path);
-                if (active)
-                {
-                    using var glowPen = new Pen(
-                        currentTheme == "Oscuro" ? Color.FromArgb(234, 88, 12) : Color.FromArgb(200, 120, 0), 2f);
-                    e.Graphics.DrawPath(glowPen, path);
-                }
+                using var pen = new Pen(active ? (currentTheme == "Oscuro" ? Color.FromArgb(234, 88, 12) : Color.FromArgb(200, 120, 0)) : Color.FromArgb(currentTheme == "Oscuro" ? 80 : 130, fgNode), active ? 2f : 1.2f);
+                e.Graphics.DrawPath(pen, path);
+
+                using var brText = new SolidBrush(active ? Color.White : fgNode);
+                using var f = new Font("Segoe UI Emoji", 19F, FontStyle.Bold);
+                var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                e.Graphics.DrawString(emoji, f, brText, new RectangleF(0, 1, iconBox.Width, iconBox.Height), sf);
             };
 
             var lblTitle = new Label
@@ -1700,6 +1772,7 @@ namespace ReprediTrayDaemon
             else
                 pgLastActive = DateTime.Now;
 
+            bool isDark = currentTheme == "Oscuro";
             Color tagColor = isDark
             ? level switch {
                 DbSyncService.LogLevel.Error => Color.FromArgb(248, 113, 113),   
@@ -1713,7 +1786,6 @@ namespace ReprediTrayDaemon
                 DbSyncService.LogLevel.Success => Color.FromArgb(107, 33, 168),  
                 _ => Color.FromArgb(37, 99, 235)                               // Azul oscuro para Info
              };
-            };
 
             Color bodyTextColor = currentTheme == "Oscuro" ? Color.FromArgb(226, 232, 240) : Color.FromArgb(15, 23, 42);
 
@@ -1851,26 +1923,39 @@ namespace ReprediTrayDaemon
 
             using var errForm = new Form
             {
-                Text = "ReprediSL V4 - Log Especial de Errores e Incidencias (sync_errors.log)",
+                Text = "ReprediSL - Errores de Sincronización",
                 StartPosition = FormStartPosition.CenterParent,
                 BackColor = dialogBg,
-                Size = new Size(1050, 650)
+                Size = new Size(1050, 650),
+                MinimumSize = new Size(750, 450),
+                Icon = this.Icon
             };
 
             var errTop = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 55,
+                Height = 72,
                 BackColor = topBg
             };
 
-            var lblSummary = new Label
+            var lblTitleErr = new Label
             {
-                Text = $"Resumen de Incidencias: {syncService.ErrorCount} Registradas",
-                Location = new Point(14, 14),
+                Text = $"ReprediSL - Errores de Sincronización  ·  {syncService.ErrorCount} {(syncService.ErrorCount == 1 ? "incidencia" : "incidencias")}",
+                Location = new Point(16, 10),
                 AutoSize = true,
-                ForeColor = Color.FromArgb(225, 29, 72),
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold)
+                ForeColor = currentTheme == "Claro" ? Color.FromArgb(15, 23, 42) : Color.FromArgb(254, 205, 211),
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold)
+            };
+
+            var lblSubErr = new Label
+            {
+                Text = syncService.ErrorCount > 0
+                    ? $"Se han detectado {syncService.ErrorCount} incidencia(s) en sync_errors.log"
+                    : "Sin errores ni incidencias registradas en esta sesión",
+                Location = new Point(16, 40),
+                AutoSize = true,
+                ForeColor = syncService.ErrorCount > 0 ? Color.FromArgb(225, 29, 72) : (currentTheme == "Claro" ? Color.FromArgb(21, 128, 61) : Color.FromArgb(57, 255, 20)),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
             };
 
             var btnClearErr = new Button
@@ -1880,10 +1965,14 @@ namespace ReprediTrayDaemon
                 BackColor = Color.FromArgb(225, 29, 72),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Size = new Size(200, 34),
-                Location = new Point(errForm.ClientSize.Width - 220, 10),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
+                Size = new Size(210, 36),
+                Location = new Point(errForm.ClientSize.Width - 230, 18),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Cursor = Cursors.Hand
             };
+            btnClearErr.FlatAppearance.BorderSize = 0;
+            using var pathClear = GetRoundedRectPath(new Rectangle(0, 0, 210, 36), 14);
+            btnClearErr.Region = new Region(pathClear);
 
             var txtErr = new RichTextBox
             {
@@ -1931,7 +2020,8 @@ namespace ReprediTrayDaemon
                 UpdateStatusLabels();
             };
 
-            errTop.Controls.Add(lblSummary);
+            errTop.Controls.Add(lblTitleErr);
+            errTop.Controls.Add(lblSubErr);
             errTop.Controls.Add(btnClearErr);
             errForm.Controls.Add(txtErr);
             errForm.Controls.Add(errTop);
@@ -1954,7 +2044,8 @@ namespace ReprediTrayDaemon
                 BackColor = dialogBg,
                 Size = new Size(920, 580),
                 MinimumSize = new Size(700, 400),
-                FormBorderStyle = FormBorderStyle.Sizable
+                FormBorderStyle = FormBorderStyle.Sizable,
+                Icon = this.Icon
             };
 
             // Cabecera

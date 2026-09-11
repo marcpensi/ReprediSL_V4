@@ -48,29 +48,37 @@ namespace ReprediTrayDaemon.Services
         public event Action<ServiceId, ServiceStatusModel>? OnServiceStatusChanged;
         public event Action<ServiceId, string, bool>? OnProcessOutput; // id, text, isError
 
+        public DaemonConfig Config { get; }
+
         public ProcessManagerService(string projectRoot)
+            : this(DaemonConfig.Load() ?? new DaemonConfig { BaseDir = projectRoot })
         {
-            ProjectRoot = projectRoot;
+        }
+
+        public ProcessManagerService(DaemonConfig config)
+        {
+            Config = config;
+            ProjectRoot = config.BaseDir;
 
             services[ServiceId.Postgres] = new ServiceStatusModel
             {
                 Id = ServiceId.Postgres,
                 DisplayName = "PostgreSQL 16",
-                Subtitle = "Puerto 5432 · repredisl_api"
+                Subtitle = $"Puerto {config.PostgresPort} · {config.PostgresDatabase}"
             };
 
             services[ServiceId.Postgrest] = new ServiceStatusModel
             {
                 Id = ServiceId.Postgrest,
                 DisplayName = "PostgREST API",
-                Subtitle = "Puerto 3000 · REST / Open-API"
+                Subtitle = $"Puerto {config.PostgrestPort} · REST / Open-API"
             };
 
             services[ServiceId.Caddy] = new ServiceStatusModel
             {
                 Id = ServiceId.Caddy,
                 DisplayName = "Caddy Reverse Proxy",
-                Subtitle = "Puertos 80/443 · SSL api.repredisl.com"
+                Subtitle = $"Puertos {config.CaddyPort}/443 · SSL api.repredisl.com"
             };
 
             services[ServiceId.SyncPedidos] = new ServiceStatusModel
@@ -84,7 +92,7 @@ namespace ReprediTrayDaemon.Services
             {
                 Id = ServiceId.AccessErp,
                 DisplayName = "Access ERP (gestion.mdb)",
-                Subtitle = @"C:\pensi\psgestw\e0012026\gestion.mdb"
+                Subtitle = config.AccessMdbPath
             };
         }
 
@@ -95,10 +103,14 @@ namespace ReprediTrayDaemon.Services
 
         public string ResolveCaddyPath()
         {
+            string cfg = Config.ResolveFullPath(Config.CaddyExecutable);
+            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+
             string[] candidates = new string[]
             {
                 "caddy.exe",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "scoop", "shims", "caddy.exe"),
+                Path.Combine(ProjectRoot, "Caddy", "caddy.exe"),
                 Path.Combine(ProjectRoot, "src", "API", "caddy.exe")
             };
 
@@ -112,27 +124,110 @@ namespace ReprediTrayDaemon.Services
 
         public string ResolvePostgrestPath()
         {
-            string cand = Path.Combine(ProjectRoot, "src", "API", "postgrest.exe");
-            return File.Exists(cand) ? cand : "postgrest.exe";
+            string cfg = Config.ResolveFullPath(Config.PostgrestExecutable);
+            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+
+            string[] candidates = new string[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "postgrest.exe"),
+                Path.Combine(ProjectRoot, "ReprediTrayDaemon", "postgrest.exe"),
+                Path.Combine(ProjectRoot, "src", "API", "postgrest.exe"),
+                "postgrest.exe"
+            };
+
+            foreach (var cand in candidates)
+            {
+                if (File.Exists(cand)) return cand;
+            }
+
+            return "postgrest.exe";
         }
 
         public string ResolvePostgrestConfig()
         {
+            string cfg = Config.ResolveFullPath(Config.PostgrestConfig);
+            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+
+            string[] candidates = new string[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "postgrest.conf"),
+                Path.Combine(ProjectRoot, "ReprediTrayDaemon", "postgrest.conf"),
+                Path.Combine(ProjectRoot, "src", "API", "postgrest.conf")
+            };
+
+            foreach (var cand in candidates)
+            {
+                if (File.Exists(cand)) return cand;
+            }
+
             return Path.Combine(ProjectRoot, "src", "API", "postgrest.conf");
         }
 
         public string ResolveCaddyfile()
         {
+            string cfg = Config.ResolveFullPath(Config.Caddyfile);
+            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+
+            string[] candidates = new string[]
+            {
+                Path.Combine(ProjectRoot, "Caddy", "Caddyfile"),
+                Path.Combine(ProjectRoot, "src", "API", "Caddyfile")
+            };
+
+            foreach (var cand in candidates)
+            {
+                if (File.Exists(cand)) return cand;
+            }
+
             return Path.Combine(ProjectRoot, "src", "API", "Caddyfile");
+        }
+
+        public string? ResolveSyncExecutable()
+        {
+            string cfg = Config.ResolveFullPath(Config.SyncExecutable);
+            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+
+            string[] candidates = new string[]
+            {
+                Path.Combine(ProjectRoot, "Sync", "sincronizador.exe"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sincronizador.exe"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "Sync", "sincronizador.exe")
+            };
+
+            foreach (var cand in candidates)
+            {
+                if (File.Exists(cand)) return cand;
+            }
+
+            return null;
         }
 
         public string ResolveSyncScript()
         {
-            return Path.Combine(ProjectRoot, "Scripts", "BaseDatos", "SincronizarPedidosEntrantes.ps1");
+            string cfg = Config.ResolveFullPath(Config.SyncScript);
+            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+
+            string[] candidates = new string[]
+            {
+                Path.Combine(ProjectRoot, "Sync", "SincronizarPedidosEntrantes.ps1"),
+                Path.Combine(ProjectRoot, "Scripts", "BaseDatos", "SincronizarPedidosEntrantes.ps1")
+            };
+
+            foreach (var cand in candidates)
+            {
+                if (File.Exists(cand)) return cand;
+            }
+
+            return candidates[0];
         }
 
         public string ResolveAccessMdbPath()
         {
+            if (!string.IsNullOrEmpty(Config.AccessMdbPath) && File.Exists(Config.AccessMdbPath))
+            {
+                return Config.AccessMdbPath;
+            }
+
             string[] candidates = new string[]
             {
                 @"C:\pensi\psgestw\e0012026\gestion.mdb",
@@ -284,26 +379,39 @@ namespace ReprediTrayDaemon.Services
             }
             else
             {
-                // Buscar si hay proceso powershell corriendo SincronizarPedidosEntrantes.ps1
+                // Buscar si hay proceso sincronizador o powershell corriendo
                 try
                 {
-                    var procs = Process.GetProcessesByName("powershell");
-                    foreach (var proc in procs)
+                    var syncProcs = Process.GetProcessesByName("sincronizador");
+                    if (syncProcs.Length > 0 && !syncProcs[0].HasExited)
                     {
-                        // Check process title or assume if registered
+                        pid = syncProcs[0].Id;
+                        isRunning = true;
+                    }
+                    else
+                    {
+                        var procs = Process.GetProcessesByName("powershell");
+                        foreach (var proc in procs)
+                        {
+                            // En proceso powershell
+                        }
                     }
                 }
                 catch { }
             }
 
             // Also verify log file freshness
-            string logPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
+            string logPath = Path.Combine(Config.ResolveFullPath(Config.LogsDir), "sync_progress.log");
+            if (!File.Exists(logPath))
+            {
+                logPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
+            }
             DateTime lastWrite = File.Exists(logPath) ? File.GetLastWriteTime(logPath) : DateTime.MinValue;
             bool recentlyActive = (DateTime.Now - lastWrite).TotalSeconds < 30;
 
             if (isRunning || recentlyActive)
             {
-                string info = pid.HasValue ? $"🟢 Activo (PID {pid}, loop 3s)" : "🟢 En ejecución en segundo plano";
+                string info = pid.HasValue ? $"🟢 Activo (PID {pid}, loop {Config.SyncIntervalSeconds}s)" : "🟢 En ejecución en segundo plano";
                 UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Activo, info, pid);
                 return true;
             }
@@ -693,23 +801,18 @@ namespace ReprediTrayDaemon.Services
                 return;
             }
 
-            string script = ResolveSyncScript();
-            if (!File.Exists(script))
-            {
-                OnProcessOutput?.Invoke(ServiceId.SyncPedidos, $"[ERROR] No se encuentra {script}", true);
-                UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Error, "Script no encontrado");
-                return;
-            }
+            string? syncExe = ResolveSyncExecutable();
+            ProcessStartInfo psi;
+            string runDesc;
 
-            UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Iniciando, "Iniciando...");
-
-            try
+            if (!string.IsNullOrEmpty(syncExe) && File.Exists(syncExe))
             {
-                var psi = new ProcessStartInfo
+                runDesc = $"sincronizador.exe (Loop {Config.SyncIntervalSeconds}s)";
+                psi = new ProcessStartInfo
                 {
-                    FileName = "powershell.exe",
-                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -Loop -IntervaloSegundos 3",
-                    WorkingDirectory = ProjectRoot,
+                    FileName = syncExe,
+                    Arguments = $"-Loop -IntervaloSegundos {Config.SyncIntervalSeconds}",
+                    WorkingDirectory = Path.GetDirectoryName(syncExe),
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -717,7 +820,36 @@ namespace ReprediTrayDaemon.Services
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
+            }
+            else
+            {
+                string script = ResolveSyncScript();
+                if (!File.Exists(script))
+                {
+                    OnProcessOutput?.Invoke(ServiceId.SyncPedidos, $"[ERROR] No se encuentra script ni ejecutable de sincronización", true);
+                    UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Error, "Sincronizador no encontrado");
+                    return;
+                }
 
+                runDesc = $"PowerShell ({Path.GetFileName(script)})";
+                psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -Loop -IntervaloSegundos {Config.SyncIntervalSeconds}",
+                    WorkingDirectory = Path.GetDirectoryName(script) ?? ProjectRoot,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+            }
+
+            UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Iniciando, "Iniciando...");
+
+            try
+            {
                 var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
                 proc.OutputDataReceived += (s, e) =>
@@ -745,7 +877,7 @@ namespace ReprediTrayDaemon.Services
 
                 activeProcesses[ServiceId.SyncPedidos] = proc;
                 UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Activo, $"🟢 Activo (PID {proc.Id})", proc.Id);
-                OnProcessOutput?.Invoke(ServiceId.SyncPedidos, $"[Sync] Sincronizador iniciado en segundo plano (PID {proc.Id})", false);
+                OnProcessOutput?.Invoke(ServiceId.SyncPedidos, $"[Sync] {runDesc} iniciado en segundo plano (PID {proc.Id})", false);
             }
             catch (Exception ex)
             {
@@ -768,6 +900,16 @@ namespace ReprediTrayDaemon.Services
                 }
                 catch { }
             }
+
+            // Also kill any orphaned sincronizador processes
+            try
+            {
+                foreach (var p in Process.GetProcessesByName("sincronizador"))
+                {
+                    try { p.Kill(true); } catch { }
+                }
+            }
+            catch { }
 
             // Also kill powershell instances running SincronizarPedidosEntrantes
             try

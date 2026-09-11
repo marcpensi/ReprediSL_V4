@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {jsPDF} from 'jspdf';
+import { buildOrderPdf, downloadOrderPdf } from './pdfOrder.js';
 import {
   Users, ShoppingCart, Package, Settings, Phone, ChevronRight, Plus, Search,
   MessageCircle, ArrowLeft, Pencil, Mail, Globe, Landmark, MapPin, Truck,
@@ -757,21 +758,12 @@ function Config({
   </section>;
 }
 
-function buildPdf(order,client,total){
-  const doc=new jsPDF();
-  doc.setFontSize(18);doc.text(`Pedido ${order.series}/${order.number}`,20,20);
-  doc.setFontSize(11);doc.text(`Cliente: ${client.commercial} (${client.code})`,20,30);doc.text(`Razón social: ${client.fiscal} - NIF/CIF: ${client.nif}`,20,37);
-  let y=50;
-  (order.lines||[]).filter(l=>Number(l.qty)>0 && l.validated===true).forEach(l=>{
-    const unitPrice=l.currentPrice != null ? Number(l.currentPrice) : (Number(l.price) || 0);
-    doc.text(`${l.code}  ${l.name}`,20,y);
-    doc.text(`${l.qty} uds x ${unitPrice.toFixed(2)} = ${(l.qty*unitPrice).toFixed(2)} EUR`,115,y);
-    y+=8;
-  });
-  doc.setFontSize(14);doc.text(`TOTAL: ${Number(total).toFixed(2)} EUR`,20,y+10);
-  return doc;
+function buildPdf(order,client,total,terminalConfig){
+  return buildOrderPdf(order,client,total,terminalConfig);
 }
-function downloadPdf(order,client,total){const doc=buildPdf(order,client,total);doc.save(`Pedido_${order.series}_${order.number}_${client.code}.pdf`)}
+function downloadPdf(order,client,total,terminalConfig){
+  return downloadOrderPdf(order,client,total,terminalConfig);
+}
 
 function App(){
   const [tab,setTab]=useState('clients');
@@ -1214,7 +1206,7 @@ function App(){
     }
 
     const calculatedTotal=finalLines.reduce((s,l)=>s+(Number(l.qty)*Number(l.currentPrice!=null?l.currentPrice:(l.price||0))),0);
-    downloadPdf({ ...draft, lines: finalLines }, client, calculatedTotal);
+    downloadPdf({ ...draft, lines: finalLines }, client, calculatedTotal, terminalConfig);
 
     const localId=`ped_${Date.now()}_${Math.random().toString(36).substring(2,7)}`;
     const pendingRecord={
@@ -1330,7 +1322,7 @@ function App(){
   };
 
   const resendOrder=(o,c)=>{
-    downloadPdf(o,c,o.total);
+    downloadPdf(o,c,o.total,terminalConfig);
     window.location.href=`mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(`Pedido ${o.series}/${o.number}`)}&body=${encodeURIComponent(`Adjunta el PDF del pedido ${o.series}/${o.number} que se acaba de generar.`)}`;
   };
 
@@ -1341,11 +1333,11 @@ function App(){
     if(screen==='clientOrders'&&client) content=<ClientOrders orders={orders} client={client} onBack={()=>{setClient(null);setScreen('clients')}} onOpen={openOrder} onNew={()=>newOrder(client)} onClientDetail={()=>setScreen('clientDetail')}/>;
     else if(screen==='clientDetail'&&client) content=<ClientDetail client={client} onBack={()=>setScreen('clientOrders')} onEdit={()=>{setEditing(client);setScreen('clientForm')}} onNewOrder={()=>newOrder(client)} onOrders={()=>setScreen('clientOrders')}/>;
     else if(screen==='clientForm') content=<ClientForm value={editing||emptyClient()} isNew={!editing} onCancel={()=>setScreen(editing?'clientDetail':'clients')} onSave={async c=>{const now=new Date().toLocaleString('es-ES');const saved={...c,lastUser:terminalConfig.sellerName,lastUpdate:now,lastSync:c.lastSync||'Nunca'};await saveClientLocal(saved);setClient(saved);setEditing(null);setScreen('clientOrders')}}/>;
-    else if(screen==='orderDetail'&&viewOrder) {const c=clients.find(x=>String(x.code)===String(viewOrder.clientCode));content=<OrderDetail order={viewOrder} client={c} onBack={()=>setScreen(client?'clientOrders':'clients')} onPdf={()=>downloadPdf(viewOrder,c,viewOrder.total)} onResend={()=>resendOrder(viewOrder,c)}/>;}
+    else if(screen==='orderDetail'&&viewOrder) {const c=clients.find(x=>String(x.code)===String(viewOrder.clientCode));content=<OrderDetail order={viewOrder} client={c} onBack={()=>setScreen(client?'clientOrders':'clients')} onPdf={()=>downloadPdf(viewOrder,c,viewOrder.total,terminalConfig)} onResend={()=>resendOrder(viewOrder,c)}/>;}
     else content=<Clients clients={clients} terminalConfig={terminalConfig} onOpen={openClientOrders} onNew={()=>{setEditing(null);setScreen('clientForm')}} onSearch={searchClients} loading={clientSearchLoading} error={clientSearchError}/>;
   } else if(tab==='orders'){
     if(screen==='orderEdit'&&draft&&client) content=<OrderEdit order={draft} setOrder={setDraft} client={client} online={online} onBack={()=>{setTab('clients');setScreen('clientOrders')}} onProducts={()=>{setTab('products');setScreen('products')}} onCatalog={()=>{setTab('products');setScreen('products')}} onFinalize={finalize} products={products} terminalConfig={terminalConfig} showToast={showToast}/>;
-    else if(screen==='orderDetail'&&viewOrder) {const c=clients.find(x=>String(x.code)===String(viewOrder.clientCode));content=<OrderDetail order={viewOrder} client={c} onBack={()=>setScreen('orders')} onPdf={()=>downloadPdf(viewOrder,c,viewOrder.total)} onResend={()=>resendOrder(viewOrder,c)}/>;}
+    else if(screen==='orderDetail'&&viewOrder) {const c=clients.find(x=>String(x.code)===String(viewOrder.clientCode));content=<OrderDetail order={viewOrder} client={c} onBack={()=>setScreen('orders')} onPdf={()=>downloadPdf(viewOrder,c,viewOrder.total,terminalConfig)} onResend={()=>resendOrder(viewOrder,c)}/>;}
     else content=<OrdersList orders={orders} onOpen={openOrder} onNew={()=>{setTab('clients');setScreen('clients')}}/>;
   } else if(tab==='products' || tab==='catalog') {
     content=<ProductsScreen
