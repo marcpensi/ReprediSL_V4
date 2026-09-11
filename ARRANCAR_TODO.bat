@@ -26,15 +26,18 @@ echo     • Sincronizador de Pedidos a Access ERP
 echo.
 
 set "DAEMON_EXE="
-if exist "%~dp0src\Daemon\bin\ReprediTrayDaemon.exe" set "DAEMON_EXE=%~dp0src\Daemon\bin\ReprediTrayDaemon.exe"
+if exist "%~dp0src\Daemon\TrayDaemon\TrayDaemon.exe" set "DAEMON_EXE=%~dp0src\Daemon\TrayDaemon\TrayDaemon.exe"
+if "%DAEMON_EXE%"=="" if exist "%~dp0TrayDaemon\TrayDaemon.exe" set "DAEMON_EXE=%~dp0TrayDaemon\TrayDaemon.exe"
+if "%DAEMON_EXE%"=="" if exist "%~dp0src\Daemon\bin\ReprediTrayDaemon.exe" set "DAEMON_EXE=%~dp0src\Daemon\bin\ReprediTrayDaemon.exe"
 if "%DAEMON_EXE%"=="" if exist "%~dp0ReprediTrayDaemon\ReprediTrayDaemon.exe" set "DAEMON_EXE=%~dp0ReprediTrayDaemon\ReprediTrayDaemon.exe"
 if "%DAEMON_EXE%"=="" if exist "%~dp0src\Daemon\ReprediTrayDaemon\bin\Release\net10.0-windows\ReprediTrayDaemon.exe" set "DAEMON_EXE=%~dp0src\Daemon\ReprediTrayDaemon\bin\Release\net10.0-windows\ReprediTrayDaemon.exe"
+if "%DAEMON_EXE%"=="" if exist "C:\pensi\psforce\TrayDaemon\TrayDaemon.exe" set "DAEMON_EXE=C:\pensi\psforce\TrayDaemon\TrayDaemon.exe"
 if "%DAEMON_EXE%"=="" if exist "C:\pensi\psforce\ReprediTrayDaemon\ReprediTrayDaemon.exe" set "DAEMON_EXE=C:\pensi\psforce\ReprediTrayDaemon\ReprediTrayDaemon.exe"
 
 if "%DAEMON_EXE%"=="" (
-    echo [ERROR] No se encuentra ReprediTrayDaemon.exe en:
+    echo [ERROR] No se encuentra TrayDaemon.exe ni ReprediTrayDaemon.exe en:
+    echo   - %~dp0src\Daemon\TrayDaemon\TrayDaemon.exe
     echo   - %~dp0src\Daemon\bin\ReprediTrayDaemon.exe
-    echo   - %~dp0ReprediTrayDaemon\ReprediTrayDaemon.exe
     echo.
     echo Ejecuta: dotnet build "%~dp0src\Daemon\ReprediTrayDaemon\ReprediTrayDaemon.csproj"
     pause
@@ -81,8 +84,10 @@ for /f "usebackq delims=" %%A in (`powershell.exe -NoProfile -ExecutionPolicy By
     set "%%A"
 )
 
-set "DAEMON_DEV=%~dp0src\Daemon\bin\ReprediTrayDaemon.exe"
-set "DAEMON_CLI=C:\pensi\psforce\ReprediTrayDaemon\ReprediTrayDaemon.exe"
+set "DAEMON_DEV=%~dp0src\Daemon\TrayDaemon\TrayDaemon.exe"
+if not exist "%DAEMON_DEV%" set "DAEMON_DEV=%~dp0src\Daemon\bin\ReprediTrayDaemon.exe"
+set "DAEMON_CLI=C:\pensi\psforce\TrayDaemon\TrayDaemon.exe"
+if not exist "%DAEMON_CLI%" set "DAEMON_CLI=C:\pensi\psforce\ReprediTrayDaemon\ReprediTrayDaemon.exe"
 set "SYNC_CLI=C:\pensi\psforce\Sync\sincronizador.exe"
 set "SYNC_DEV=%~dp0src\Sync\ReprediSync\bin\Release\net10.0-windows\sincronizador.exe"
 set "POSTGREST_EXE=%~dp0src\API\postgrest.exe"

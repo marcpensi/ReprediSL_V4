@@ -26,13 +26,27 @@ namespace ReprediTrayDaemon.Services
 
     public class PostgrestConfig
     {
+        public string ServerHost { get; set; } = "127.0.0.1";
         public int Port { get; set; } = 3000;
+        public string DbSchemas { get; set; } = "api";
+        public string DbAnonRole { get; set; } = "web_anon";
+        public string DbUri { get; set; } = "postgres://authenticator@localhost:5433/repredisl_api";
+        public string CorsAllowedOrigins { get; set; } = "https://pedidos.repredisl.com";
     }
 
     public class CaddyConfig
     {
         public int HttpPort { get; set; } = 80;
         public int HttpsPort { get; set; } = 443;
+        public string Domain { get; set; } = "api.repredisl.com";
+        public string ReverseProxyHost { get; set; } = "127.0.0.1";
+        public int ReverseProxyPort { get; set; } = 3000;
+    }
+
+    public class UrlsConfig
+    {
+        public string Api { get; set; } = "https://api.repredisl.com";
+        public string Pedidos { get; set; } = "https://pedidos.repredisl.com";
     }
 
     /// <summary>
@@ -50,6 +64,7 @@ namespace ReprediTrayDaemon.Services
         public PostgresConfig PostgreSQL { get; set; } = new();
         public PostgrestConfig PostgREST { get; set; } = new();
         public CaddyConfig Caddy { get; set; } = new();
+        public UrlsConfig Urls { get; set; } = new();
 
         [JsonIgnore]
         public string LoadedFromPath { get; private set; } = string.Empty;

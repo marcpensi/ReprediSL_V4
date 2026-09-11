@@ -17,12 +17,12 @@ echo   REPREDISL V4 - PANEL DE DETENCION DE SERVICIOS
 echo ================================================================================
 echo.
 echo   Estado actual de los procesos:
-powershell -NoProfile -Command "$procs = @('ReprediTrayDaemon', 'sincronizador', 'postgrest', 'caddy'); foreach ($pr in $procs) { $found = Get-Process -Name $pr -ErrorAction SilentlyContinue; if ($found) { Write-Host ('    [ACTIVO]   ' + $pr) -ForegroundColor Green } else { Write-Host ('    [DETENIDO] ' + $pr) -ForegroundColor DarkGray } }"
+powershell -NoProfile -Command "$procs = @('TrayDaemon', 'ReprediTrayDaemon', 'sincronizador', 'postgrest', 'caddy'); foreach ($pr in $procs) { $found = Get-Process -Name $pr -ErrorAction SilentlyContinue; if ($found) { Write-Host ('    [ACTIVO]   ' + $pr) -ForegroundColor Green } else { Write-Host ('    [DETENIDO] ' + $pr) -ForegroundColor DarkGray } }"
 echo.
 echo --------------------------------------------------------------------------------
 echo   Selecciona una opcion:
 echo --------------------------------------------------------------------------------
-echo     1. Detener Centro de Control (ReprediTrayDaemon)
+echo     1. Detener Centro de Control (TrayDaemon)
 echo     2. Detener Sincronizador de Pedidos (sincronizador / script)
 echo     3. Detener API PostgREST (postgrest)
 echo     4. Detener Servidor Proxy HTTPS (caddy)
@@ -48,9 +48,10 @@ goto MENU
 
 :PARAR_DAEMON
 echo.
-echo Deteniendo ReprediTrayDaemon...
+echo Deteniendo TrayDaemon...
+taskkill /F /IM TrayDaemon.exe > nul 2>&1
 taskkill /F /IM ReprediTrayDaemon.exe > nul 2>&1
-echo [OK] ReprediTrayDaemon detenido.
+echo [OK] TrayDaemon detenido.
 echo.
 pause
 goto MENU
@@ -104,7 +105,8 @@ echo.
 echo ================================================================================
 echo   DETENIENDO TODOS LOS SERVICIOS DE REPREDISL...
 echo ================================================================================
-echo   - Deteniendo ReprediTrayDaemon...
+echo   - Deteniendo TrayDaemon...
+taskkill /F /IM TrayDaemon.exe > nul 2>&1
 taskkill /F /IM ReprediTrayDaemon.exe > nul 2>&1
 
 echo   - Deteniendo Sincronizador de Pedidos...

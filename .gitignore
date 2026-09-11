@@ -6,6 +6,7 @@ scratch/
 *.log
 bin/
 obj/
+src/Daemon/TrayDaemon/
 *.ldb
 *.laccdb
 .vs/

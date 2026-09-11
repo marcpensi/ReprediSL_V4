@@ -13,11 +13,12 @@ echo     3. Caddy Reverse Proxy
 echo     4. Sincronizador de Pedidos (Access ERP)
 echo.
 
-set "DAEMON_EXE=%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
+set "DAEMON_EXE=%~dp0..\..\src\Daemon\TrayDaemon\TrayDaemon.exe"
+if not exist "%DAEMON_EXE%" set "DAEMON_EXE=%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
 if not exist "%DAEMON_EXE%" set "DAEMON_EXE=%~dp0..\..\src\Daemon\ReprediTrayDaemon\bin\Release\net10.0-windows\ReprediTrayDaemon.exe"
 if not exist "%DAEMON_EXE%" set "DAEMON_EXE=%~dp0..\..\ReprediTrayDaemon\ReprediTrayDaemon.exe"
 if not exist "%DAEMON_EXE%" (
-    echo [ERROR] No se encuentra ReprediTrayDaemon.exe
+    echo [ERROR] No se encuentra TrayDaemon.exe ni ReprediTrayDaemon.exe
     echo Ejecuta: dotnet build "%~dp0..\..\src\Daemon\ReprediTrayDaemon\ReprediTrayDaemon.csproj"
     pause
     exit /b 1

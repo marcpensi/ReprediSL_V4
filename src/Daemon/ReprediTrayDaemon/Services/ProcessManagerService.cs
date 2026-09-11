@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -147,6 +147,20 @@ namespace ReprediTrayDaemon.Services
 
             string devCaddyfile = Path.Combine(ProjectRoot, "src", "API", "Caddyfile");
             if (File.Exists(devCaddyfile)) return devCaddyfile;
+
+            // Autogenerar Caddyfile a partir de config.json si no existe
+            try
+            {
+                string dir = Path.GetDirectoryName(cfg)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string domain = string.IsNullOrWhiteSpace(Config.Caddy.Domain) ? "api.repredisl.com" : Config.Caddy.Domain;
+                string upstreamHost = string.IsNullOrWhiteSpace(Config.Caddy.ReverseProxyHost) ? "127.0.0.1" : Config.Caddy.ReverseProxyHost;
+                int upstreamPort = Config.Caddy.ReverseProxyPort > 0 ? Config.Caddy.ReverseProxyPort : 3000;
+                string content = $"{domain} {{\n    reverse_proxy {upstreamHost}:{upstreamPort}\n}}\n";
+                File.WriteAllText(cfg, content, Encoding.UTF8);
+                return cfg;
+            }
+            catch { }
 
             return cfg;
         }
@@ -583,13 +597,26 @@ namespace ReprediTrayDaemon.Services
                     StandardErrorEncoding = Encoding.UTF8
                 };
 
-                // Inyectar puerto y configuración segura en variables de entorno del proceso
+                // Inyectar configuración de PostgREST desde config.json mediante variables de entorno
+                psi.EnvironmentVariables["PGRST_SERVER_HOST"] = string.IsNullOrWhiteSpace(Config.PostgREST.ServerHost) ? "127.0.0.1" : Config.PostgREST.ServerHost;
                 psi.EnvironmentVariables["PGRST_SERVER_PORT"] = Config.PostgREST.Port.ToString();
+                psi.EnvironmentVariables["PGRST_DB_SCHEMAS"] = string.IsNullOrWhiteSpace(Config.PostgREST.DbSchemas) ? "api" : Config.PostgREST.DbSchemas;
+                psi.EnvironmentVariables["PGRST_DB_ANON_ROLE"] = string.IsNullOrWhiteSpace(Config.PostgREST.DbAnonRole) ? "web_anon" : Config.PostgREST.DbAnonRole;
+
                 string pwd = DaemonConfig.GetPostgresPassword();
                 if (!string.IsNullOrEmpty(pwd))
                 {
                     string host = string.IsNullOrWhiteSpace(Config.PostgreSQL.Host) ? "localhost" : Config.PostgreSQL.Host;
                     psi.EnvironmentVariables["PGRST_DB_URI"] = $"postgres://authenticator:{pwd}@{host}:{Config.PostgreSQL.Port}/{Config.PostgreSQL.Database}";
+                }
+                else if (!string.IsNullOrWhiteSpace(Config.PostgREST.DbUri))
+                {
+                    psi.EnvironmentVariables["PGRST_DB_URI"] = Config.PostgREST.DbUri;
+                }
+
+                if (!string.IsNullOrWhiteSpace(Config.PostgREST.CorsAllowedOrigins))
+                {
+                    psi.EnvironmentVariables["PGRST_SERVER_CORS_ALLOWED_ORIGINS"] = Config.PostgREST.CorsAllowedOrigins;
                 }
 
                 var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };

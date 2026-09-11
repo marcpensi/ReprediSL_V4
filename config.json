@@ -16,10 +16,22 @@
     "ServiceName": "postgresql-x64-17"
   },
   "PostgREST": {
-    "Port": 3000
+    "ServerHost": "127.0.0.1",
+    "Port": 3000,
+    "DbSchemas": "api",
+    "DbAnonRole": "web_anon",
+    "DbUri": "postgres://authenticator@localhost:5433/repredisl_api",
+    "CorsAllowedOrigins": "https://pedidos.repredisl.com"
   },
   "Caddy": {
     "HttpPort": 80,
-    "HttpsPort": 443
+    "HttpsPort": 443,
+    "Domain": "api.repredisl.com",
+    "ReverseProxyHost": "127.0.0.1",
+    "ReverseProxyPort": 3000
+  },
+  "Urls": {
+    "Api": "https://api.repredisl.com",
+    "Pedidos": "https://pedidos.repredisl.com"
   }
 }

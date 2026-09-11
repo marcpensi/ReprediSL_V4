@@ -6,10 +6,13 @@ echo  INICIANDO DEMONIO DE SINCRONIZACION NATIVO (.NET 10)
 echo =========================================================
 echo.
 
+taskkill /F /IM TrayDaemon.exe > nul 2>&1
 taskkill /F /IM ReprediTrayDaemon.exe > nul 2>&1
 ping -n 2 127.0.0.1 > nul
 
-start "" "%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
+set "DAEMON_EXE=%~dp0..\..\src\Daemon\TrayDaemon\TrayDaemon.exe"
+if not exist "%DAEMON_EXE%" set "DAEMON_EXE=%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
+start "" "%DAEMON_EXE%"
 
 echo Demonio iniciado correctamente (.NET 10).
 echo Se ha abierto la ventana de monitoreo e icono en la barra de tareas (junto al reloj).
