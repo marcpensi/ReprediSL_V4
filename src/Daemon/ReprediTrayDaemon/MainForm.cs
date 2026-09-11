@@ -127,33 +127,18 @@ namespace ReprediTrayDaemon
         [System.Runtime.InteropServices.DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(System.IntPtr hWnd, int wMsg, int wParam, int lParam);
 
+        private DaemonConfig config = null!;
+
         private static string ResolveProjectRoot()
         {
-            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-            while (dir != null)
+            try
             {
-                if (File.Exists(Path.Combine(dir.FullName, "AGENTS.md")) &&
-                    Directory.Exists(Path.Combine(dir.FullName, "Scripts", "BaseDatos")))
-                {
-                    return dir.FullName;
-                }
-
-                if (Directory.Exists(Path.Combine(dir.FullName, "Scripts", "BaseDatos")) &&
-                    Directory.Exists(Path.Combine(dir.FullName, "src", "Daemon")))
-                {
-                    return dir.FullName;
-                }
-
-                dir = dir.Parent;
+                return DaemonConfig.Load().ProjectRoot;
             }
-
-            string fallback = @"D:\programacio\repredi\ReprediSL_V4";
-            if (Directory.Exists(fallback))
+            catch
             {
-                return fallback;
+                return AppDomain.CurrentDomain.BaseDirectory;
             }
-
-            return AppDomain.CurrentDomain.BaseDirectory;
         }
 
         public MainForm(bool autoStartAll = false)
@@ -162,9 +147,9 @@ namespace ReprediTrayDaemon
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
 
-            var config = DaemonConfig.Load();
-            string projectRoot = config.BaseDir;
-            settingsFilePath = Path.Combine(projectRoot, "src", "Access", "ui_settings.json");
+            config = DaemonConfig.Load();
+            string projectRoot = config.ProjectRoot;
+            settingsFilePath = Path.Combine(projectRoot, "ui_settings.json");
             if (!File.Exists(settingsFilePath))
             {
                 settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ui_settings.json");
@@ -184,8 +169,8 @@ namespace ReprediTrayDaemon
             ApplyTheme(currentTheme);
             UpdateStatusLabels();
 
-            syncService.AppendLog("Centro de Control ReprediSL V4 iniciado correctamente.", DbSyncService.LogLevel.Info);
-            syncService.AppendLog("Base de datos destino: repredisl_api (PostgreSQL 16) ⇄ gestion.mdb", DbSyncService.LogLevel.Info);
+            syncService.AppendLog($"{config.AppName} iniciado correctamente.", DbSyncService.LogLevel.Info);
+            syncService.AppendLog($"Base de datos destino: {config.PostgreSQL.Database} ({config.PostgreSQL.ServiceName}) ⇄ {config.PsGest.DatabaseFile}", DbSyncService.LogLevel.Info);
 
             timerHealth = new System.Windows.Forms.Timer { Interval = 1000 };
             timerHealth.Tick += TimerHealth_Tick;
@@ -309,7 +294,7 @@ namespace ReprediTrayDaemon
 
             lblHeaderSubtitle = new Label
             {
-                Text = "PostgreSQL 16 · repredisl_api ⇄ ODBC · gestion.mdb (Puerto 3000 / SSL 443)",
+                Text = $"{config.PostgreSQL.ServiceName} · {config.PostgreSQL.Database} ⇄ ODBC · {config.PsGest.DatabaseFile} (Puerto {config.PostgREST.Port} / SSL {config.Caddy.HttpsPort})",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(54, 30),
@@ -425,7 +410,7 @@ namespace ReprediTrayDaemon
                 BackColor = Color.Transparent
             };
 
-            cardNodePg = CreatePipelineNodeCard("🗄️", "PostgreSQL", "repredisl_api",
+            cardNodePg = CreatePipelineNodeCard("🗄️", "PostgreSQL", config.PostgreSQL.Database,
                 () => (DateTime.Now - pgLastActive).TotalSeconds < 3,
                 out lblNodePgStatus, out iconNodePg);
             cardNodePg.Location = new Point(0, 0);
@@ -435,7 +420,7 @@ namespace ReprediTrayDaemon
                 out lblNodeBridgeStatus, out iconNodeBridge);
             cardNodeBridge.Location = new Point(380, 0);
 
-            cardNodeAccess = CreatePipelineNodeCard("📄", "Access ERP", "gestion.mdb",
+            cardNodeAccess = CreatePipelineNodeCard("📄", "Access ERP", config.PsGest.DatabaseFile,
                 () => (DateTime.Now - accessLastActive).TotalSeconds < 3,
                 out lblNodeAccessStatus, out iconNodeAccess);
             cardNodeAccess.Location = new Point(760, 0);
@@ -802,8 +787,8 @@ namespace ReprediTrayDaemon
                 tableServices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
             }
 
-            cardSvcPg = CreateSingleServiceTile("🐘", "PostgreSQL", ":5432 · repredisl_api", out lblSvcPgStatus, out _, null);
-            cardSvcPostgrest = CreateSingleServiceTile("⚡", "PostgREST API", ":3000 · REST API", out lblSvcPostgrestStatus, out btnTogglePostgrest,
+            cardSvcPg = CreateSingleServiceTile("🐘", "PostgreSQL", $":{config.PostgreSQL.Port} · {config.PostgreSQL.Database}", out lblSvcPgStatus, out _, null);
+            cardSvcPostgrest = CreateSingleServiceTile("⚡", "PostgREST API", $":{config.PostgREST.Port} · REST API", out lblSvcPostgrestStatus, out btnTogglePostgrest,
                 async () =>
                 {
                     if (processManager.GetStatus(ServiceId.Postgrest).State == ServiceStatusState.Activo)
@@ -811,7 +796,7 @@ namespace ReprediTrayDaemon
                     else
                         await processManager.StartPostgrestAsync();
                 });
-            cardSvcCaddy = CreateSingleServiceTile("🌐", "Caddy Proxy", ":443 · SSL HTTPS", out lblSvcCaddyStatus, out btnToggleCaddy,
+            cardSvcCaddy = CreateSingleServiceTile("🌐", "Caddy Proxy", $":{config.Caddy.HttpsPort} · SSL HTTPS", out lblSvcCaddyStatus, out btnToggleCaddy,
                 async () =>
                 {
                     if (processManager.GetStatus(ServiceId.Caddy).State == ServiceStatusState.Activo)
@@ -827,7 +812,7 @@ namespace ReprediTrayDaemon
                     else
                         await processManager.StartSyncPedidosAsync();
                 });
-            cardSvcAccess = CreateSingleServiceTile("📄", "Access ERP", "gestion.mdb", out lblSvcAccessStatus, out _, null);
+            cardSvcAccess = CreateSingleServiceTile("📄", "Access ERP", config.PsGest.DatabaseFile, out lblSvcAccessStatus, out _, null);
 
             tableServices.Controls.Add(cardSvcPg, 0, 0);
             tableServices.Controls.Add(cardSvcPostgrest, 1, 0);
@@ -1103,7 +1088,7 @@ namespace ReprediTrayDaemon
             // Sincronizar nodos del diagrama de pipeline con el estado real
             if (id == ServiceId.Postgres)
             {
-                lblNodePgStatus.Text = model.State == ServiceStatusState.Activo ? "🟢 Activo (:5432)" : "🔴 Desconectado";
+                lblNodePgStatus.Text = model.State == ServiceStatusState.Activo ? $"🟢 Activo (:{config.PostgreSQL.Port})" : "🔴 Desconectado";
                 if (model.State == ServiceStatusState.Activo) pgLastActive = DateTime.Now;
             }
             else if (id == ServiceId.Postgrest || id == ServiceId.SyncPedidos)
@@ -1116,7 +1101,7 @@ namespace ReprediTrayDaemon
             }
             else if (id == ServiceId.AccessErp)
             {
-                lblNodeAccessStatus.Text = model.State == ServiceStatusState.Activo ? "🟢 gestion.mdb OK" : "🔴 Inaccesible";
+                lblNodeAccessStatus.Text = model.State == ServiceStatusState.Activo ? $"🟢 {config.PsGest.DatabaseFile} OK" : "🔴 Inaccesible";
                 if (model.State == ServiceStatusState.Activo) accessLastActive = DateTime.Now;
             }
         }
@@ -1209,7 +1194,11 @@ namespace ReprediTrayDaemon
             }
 
             var level = isError ? DbSyncService.LogLevel.Error :
-                        (text.Contains("[OK]", StringComparison.OrdinalIgnoreCase) || text.Contains("éxito", StringComparison.OrdinalIgnoreCase) || text.Contains("exito", StringComparison.OrdinalIgnoreCase)
+                        (text.Contains("[OK]", StringComparison.OrdinalIgnoreCase) ||
+                         text.Contains("éxito", StringComparison.OrdinalIgnoreCase) ||
+                         text.Contains("exito", StringComparison.OrdinalIgnoreCase) ||
+                         text.Contains("Successfully", StringComparison.OrdinalIgnoreCase) ||
+                         text.Contains("listening on", StringComparison.OrdinalIgnoreCase)
                             ? DbSyncService.LogLevel.Success
                             : DbSyncService.LogLevel.Info);
 

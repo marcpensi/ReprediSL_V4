@@ -1,8 +1,41 @@
-param()
+param(
+    [string]$DbMdb = ""
+)
 
-$mdb = "D:\programacio\repredi\ReprediSL_V4\src\Access\E0012026\gestion.mdb"
+$ErrorActionPreference = "Stop"
+
+$ScriptDir = $PSScriptRoot
+if (-not $ScriptDir) {
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+}
+
+if (-not $DbMdb) {
+    $loaderCandidates = @(
+        (Join-Path $ScriptDir "..\Despliegue\Load-PsForceConfig.ps1"),
+        (Join-Path $ScriptDir "..\Load-PsForceConfig.ps1"),
+        (Join-Path $ScriptDir "Load-PsForceConfig.ps1"),
+        "C:\Pensi\PsForce\Scripts\Despliegue\Load-PsForceConfig.ps1"
+    )
+    $cfg = $null
+    foreach ($cand in $loaderCandidates) {
+        if (Test-Path -LiteralPath $cand) {
+            $cfg = & $cand
+            break
+        }
+    }
+    if ($cfg) {
+        $DbMdb = $cfg.AccessDbPath
+    }
+}
+
+if (-not $DbMdb -or -not (Test-Path -LiteralPath $DbMdb)) {
+    throw "No se ha encontrado el archivo gestion.mdb en: $DbMdb"
+}
+
+Write-Host "Consultando pedidos en: $DbMdb" -ForegroundColor Cyan
+
 $cn = New-Object -ComObject ADODB.Connection
-$cn.Open("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$mdb")
+$cn.Open("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$DbMdb")
 $rs = $cn.Execute("SELECT TOP 5 IdEmpresa, Ejercicio, Serie, NumPedido, Fecha, IdCliente, Total, Canal FROM PedidosCab ORDER BY Fecha DESC")
 
 while (-not $rs.EOF) {

@@ -40,7 +40,7 @@ namespace ReprediTrayDaemon.Services
 
     public class ProcessManagerService
     {
-        public string ProjectRoot { get; }
+        public string ProjectRoot => Config.ProjectRoot;
         private readonly ConcurrentDictionary<ServiceId, ServiceStatusModel> services = new();
         private readonly ConcurrentDictionary<ServiceId, Process> activeProcesses = new();
         private static readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
@@ -51,48 +51,48 @@ namespace ReprediTrayDaemon.Services
         public DaemonConfig Config { get; }
 
         public ProcessManagerService(string projectRoot)
-            : this(DaemonConfig.Load() ?? new DaemonConfig { BaseDir = projectRoot })
+            : this(DaemonConfig.Load())
         {
         }
 
         public ProcessManagerService(DaemonConfig config)
         {
-            Config = config;
-            ProjectRoot = config.BaseDir;
+            Config = config ?? DaemonConfig.Load();
+            Config.EnsureDirectories();
 
             services[ServiceId.Postgres] = new ServiceStatusModel
             {
                 Id = ServiceId.Postgres,
-                DisplayName = "PostgreSQL 16",
-                Subtitle = $"Puerto {config.PostgresPort} · {config.PostgresDatabase}"
+                DisplayName = $"PostgreSQL ({Config.PostgreSQL.ServiceName})",
+                Subtitle = $"Puerto {Config.PostgreSQL.Port} · {Config.PostgreSQL.Database}"
             };
 
             services[ServiceId.Postgrest] = new ServiceStatusModel
             {
                 Id = ServiceId.Postgrest,
                 DisplayName = "PostgREST API",
-                Subtitle = $"Puerto {config.PostgrestPort} · REST / Open-API"
+                Subtitle = $"Puerto {Config.PostgREST.Port} · REST / Open-API"
             };
 
             services[ServiceId.Caddy] = new ServiceStatusModel
             {
                 Id = ServiceId.Caddy,
                 DisplayName = "Caddy Reverse Proxy",
-                Subtitle = $"Puertos {config.CaddyPort}/443 · SSL api.repredisl.com"
+                Subtitle = $"Puertos {Config.Caddy.HttpPort}/{Config.Caddy.HttpsPort} · SSL"
             };
 
             services[ServiceId.SyncPedidos] = new ServiceStatusModel
             {
                 Id = ServiceId.SyncPedidos,
                 DisplayName = "Sincronizador Pedidos",
-                Subtitle = "Consumo pedidos_nuevos → gestion.mdb"
+                Subtitle = $"Consumo pedidos_nuevos → {Config.PsGest.DatabaseFile}"
             };
 
             services[ServiceId.AccessErp] = new ServiceStatusModel
             {
                 Id = ServiceId.AccessErp,
-                DisplayName = "Access ERP (gestion.mdb)",
-                Subtitle = config.AccessMdbPath
+                DisplayName = $"Access ERP ({Config.PsGest.DatabaseFile})",
+                Subtitle = Config.AccessDbPath
             };
         }
 
@@ -103,144 +103,82 @@ namespace ReprediTrayDaemon.Services
 
         public string ResolveCaddyPath()
         {
-            string cfg = Config.ResolveFullPath(Config.CaddyExecutable);
-            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+            string cfg = Config.CaddyExecutable;
+            if (File.Exists(cfg)) return cfg;
 
-            string[] candidates = new string[]
-            {
-                "caddy.exe",
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "scoop", "shims", "caddy.exe"),
-                Path.Combine(ProjectRoot, "Caddy", "caddy.exe"),
-                Path.Combine(ProjectRoot, "src", "API", "caddy.exe")
-            };
+            string devCaddy = Path.Combine(ProjectRoot, "src", "API", "caddy.exe");
+            if (File.Exists(devCaddy)) return devCaddy;
 
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
-
-            return "caddy";
+            return "caddy.exe";
         }
 
         public string ResolvePostgrestPath()
         {
-            string cfg = Config.ResolveFullPath(Config.PostgrestExecutable);
-            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+            string cfg = Config.PostgrestExecutable;
+            if (File.Exists(cfg)) return cfg;
 
-            string[] candidates = new string[]
-            {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "postgrest.exe"),
-                Path.Combine(ProjectRoot, "ReprediTrayDaemon", "postgrest.exe"),
-                Path.Combine(ProjectRoot, "src", "API", "postgrest.exe"),
-                "postgrest.exe"
-            };
+            string appDirPostgrest = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "postgrest.exe");
+            if (File.Exists(appDirPostgrest)) return appDirPostgrest;
 
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
+            string devPostgrest = Path.Combine(ProjectRoot, "src", "API", "postgrest.exe");
+            if (File.Exists(devPostgrest)) return devPostgrest;
 
             return "postgrest.exe";
         }
 
         public string ResolvePostgrestConfig()
         {
-            string cfg = Config.ResolveFullPath(Config.PostgrestConfig);
-            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+            string cfg = Config.PostgrestConfig;
+            if (File.Exists(cfg)) return cfg;
 
-            string[] candidates = new string[]
-            {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "postgrest.conf"),
-                Path.Combine(ProjectRoot, "ReprediTrayDaemon", "postgrest.conf"),
-                Path.Combine(ProjectRoot, "src", "API", "postgrest.conf")
-            };
+            string appDirConf = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "postgrest.conf");
+            if (File.Exists(appDirConf)) return appDirConf;
 
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
+            string devConf = Path.Combine(ProjectRoot, "src", "API", "postgrest.conf");
+            if (File.Exists(devConf)) return devConf;
 
-            return Path.Combine(ProjectRoot, "src", "API", "postgrest.conf");
+            return cfg;
         }
 
         public string ResolveCaddyfile()
         {
-            string cfg = Config.ResolveFullPath(Config.Caddyfile);
-            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+            string cfg = Config.Caddyfile;
+            if (File.Exists(cfg)) return cfg;
 
-            string[] candidates = new string[]
-            {
-                Path.Combine(ProjectRoot, "Caddy", "Caddyfile"),
-                Path.Combine(ProjectRoot, "src", "API", "Caddyfile")
-            };
+            string devCaddyfile = Path.Combine(ProjectRoot, "src", "API", "Caddyfile");
+            if (File.Exists(devCaddyfile)) return devCaddyfile;
 
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
-
-            return Path.Combine(ProjectRoot, "src", "API", "Caddyfile");
+            return cfg;
         }
 
         public string? ResolveSyncExecutable()
         {
-            string cfg = Config.ResolveFullPath(Config.SyncExecutable);
-            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+            string cfg = Config.SyncExecutable;
+            if (File.Exists(cfg)) return cfg;
 
-            string[] candidates = new string[]
-            {
-                Path.Combine(ProjectRoot, "Sync", "sincronizador.exe"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sincronizador.exe"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "Sync", "sincronizador.exe")
-            };
+            string appDirSync = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sincronizador.exe");
+            if (File.Exists(appDirSync)) return appDirSync;
 
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
+            string devSync = Path.Combine(ProjectRoot, "src", "Sync", "ReprediSync", "bin", "Release", "net10.0-windows", "sincronizador.exe");
+            if (File.Exists(devSync)) return devSync;
 
             return null;
         }
 
         public string ResolveSyncScript()
         {
-            string cfg = Config.ResolveFullPath(Config.SyncScript);
-            if (!string.IsNullOrEmpty(cfg) && File.Exists(cfg)) return cfg;
+            string cfg = Config.SyncScript;
+            if (File.Exists(cfg)) return cfg;
 
-            string[] candidates = new string[]
-            {
-                Path.Combine(ProjectRoot, "Sync", "SincronizarPedidosEntrantes.ps1"),
-                Path.Combine(ProjectRoot, "Scripts", "BaseDatos", "SincronizarPedidosEntrantes.ps1")
-            };
+            string script = Path.Combine(Config.ScriptsDir, "BaseDatos", "SincronizarPedidosEntrantes.ps1");
+            if (File.Exists(script)) return script;
 
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
-
-            return candidates[0];
+            return cfg;
         }
 
         public string ResolveAccessMdbPath()
         {
-            if (!string.IsNullOrEmpty(Config.AccessMdbPath) && File.Exists(Config.AccessMdbPath))
-            {
-                return Config.AccessMdbPath;
-            }
-
-            string[] candidates = new string[]
-            {
-                @"C:\pensi\psgestw\e0012026\gestion.mdb",
-                Path.Combine(ProjectRoot, "src", "Access", "E0012026", "gestion.mdb"),
-                Path.Combine(ProjectRoot, "src", "Access", "gestion.mdb")
-            };
-
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand)) return cand;
-            }
-
-            return candidates[0];
+            return Config.AccessDbPath;
         }
 
         private void UpdateServiceState(ServiceId id, ServiceStatusState state, string detail, int? pid = null)
@@ -273,10 +211,14 @@ namespace ReprediTrayDaemon.Services
         public async Task<bool> CheckPostgresAsync()
         {
             bool ok = false;
+            string host = string.IsNullOrWhiteSpace(Config.PostgreSQL.Host) ? "127.0.0.1" : Config.PostgreSQL.Host;
+            if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) host = "127.0.0.1";
+            int port = Config.PostgreSQL.Port;
+
             try
             {
                 using var tcp = new TcpClient();
-                var connectTask = tcp.ConnectAsync("127.0.0.1", 5432);
+                var connectTask = tcp.ConnectAsync(host, port);
                 var completed = await Task.WhenAny(connectTask, Task.Delay(500));
                 if (completed == connectTask && tcp.Connected)
                 {
@@ -287,11 +229,11 @@ namespace ReprediTrayDaemon.Services
 
             if (ok)
             {
-                UpdateServiceState(ServiceId.Postgres, ServiceStatusState.Activo, "🟢 Escuchando en 127.0.0.1:5432");
+                UpdateServiceState(ServiceId.Postgres, ServiceStatusState.Activo, $"🟢 Escuchando en {host}:{port}");
             }
             else
             {
-                UpdateServiceState(ServiceId.Postgres, ServiceStatusState.Detenido, "🔴 Puerto 5432 cerrado / Inactivo");
+                UpdateServiceState(ServiceId.Postgres, ServiceStatusState.Detenido, $"🔴 Puerto {port} cerrado / Inactivo");
             }
             return ok;
         }
@@ -300,11 +242,12 @@ namespace ReprediTrayDaemon.Services
         {
             bool ok = false;
             int? pid = activeProcesses.TryGetValue(ServiceId.Postgrest, out var p) && !p.HasExited ? p.Id : null;
+            int port = Config.PostgREST.Port;
 
             try
             {
                 using var tcp = new TcpClient();
-                var connectTask = tcp.ConnectAsync("127.0.0.1", 3000);
+                var connectTask = tcp.ConnectAsync("127.0.0.1", port);
                 var completed = await Task.WhenAny(connectTask, Task.Delay(500));
                 if (completed == connectTask && tcp.Connected)
                 {
@@ -315,12 +258,12 @@ namespace ReprediTrayDaemon.Services
 
             if (ok)
             {
-                string info = pid.HasValue ? $"🟢 Activo (PID {pid}, :3000)" : "🟢 Activo en 127.0.0.1:3000";
+                string info = pid.HasValue ? $"🟢 Activo (PID {pid}, :{port})" : $"🟢 Activo en 127.0.0.1:{port}";
                 UpdateServiceState(ServiceId.Postgrest, ServiceStatusState.Activo, info, pid);
             }
             else
             {
-                UpdateServiceState(ServiceId.Postgrest, ServiceStatusState.Detenido, "🔴 Detenido (Puerto 3000 libre)");
+                UpdateServiceState(ServiceId.Postgrest, ServiceStatusState.Detenido, $"🔴 Detenido (Puerto {port} libre)");
             }
             return ok;
         }
@@ -344,26 +287,38 @@ namespace ReprediTrayDaemon.Services
                 isProcessRunning = true;
             }
 
-            // Also check TCP 80 or 443
+            // Chequeo TCP HttpPort y HttpsPort
             bool portOk = false;
             try
             {
                 using var tcp = new TcpClient();
-                var connectTask = tcp.ConnectAsync("127.0.0.1", 80);
+                var connectTask = tcp.ConnectAsync("127.0.0.1", Config.Caddy.HttpPort);
                 var completed = await Task.WhenAny(connectTask, Task.Delay(400));
                 if (completed == connectTask && tcp.Connected) portOk = true;
             }
             catch { }
 
+            if (!portOk)
+            {
+                try
+                {
+                    using var tcp2 = new TcpClient();
+                    var connectTask2 = tcp2.ConnectAsync("127.0.0.1", Config.Caddy.HttpsPort);
+                    var completed2 = await Task.WhenAny(connectTask2, Task.Delay(400));
+                    if (completed2 == connectTask2 && tcp2.Connected) portOk = true;
+                }
+                catch { }
+            }
+
             if (isProcessRunning || portOk)
             {
-                string info = pid.HasValue ? $"🟢 Activo (PID {pid}, SSL 443)" : "🟢 Activo en puertos 80/443";
+                string info = pid.HasValue ? $"🟢 Activo (PID {pid}, SSL {Config.Caddy.HttpsPort})" : $"🟢 Activo en puertos {Config.Caddy.HttpPort}/{Config.Caddy.HttpsPort}";
                 UpdateServiceState(ServiceId.Caddy, ServiceStatusState.Activo, info, pid);
                 return true;
             }
             else
             {
-                UpdateServiceState(ServiceId.Caddy, ServiceStatusState.Detenido, "🔴 Detenido (Puertos 80/443 libres)");
+                UpdateServiceState(ServiceId.Caddy, ServiceStatusState.Detenido, $"🔴 Detenido (Puertos {Config.Caddy.HttpPort}/{Config.Caddy.HttpsPort} libres)");
                 return false;
             }
         }
@@ -379,7 +334,6 @@ namespace ReprediTrayDaemon.Services
             }
             else
             {
-                // Buscar si hay proceso sincronizador o powershell corriendo
                 try
                 {
                     var syncProcs = Process.GetProcessesByName("sincronizador");
@@ -388,24 +342,12 @@ namespace ReprediTrayDaemon.Services
                         pid = syncProcs[0].Id;
                         isRunning = true;
                     }
-                    else
-                    {
-                        var procs = Process.GetProcessesByName("powershell");
-                        foreach (var proc in procs)
-                        {
-                            // En proceso powershell
-                        }
-                    }
                 }
                 catch { }
             }
 
-            // Also verify log file freshness
-            string logPath = Path.Combine(Config.ResolveFullPath(Config.LogsDir), "sync_progress.log");
-            if (!File.Exists(logPath))
-            {
-                logPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
-            }
+            // Verificar actividad reciente en log centralizado
+            string logPath = Config.ProgressLogPath;
             DateTime lastWrite = File.Exists(logPath) ? File.GetLastWriteTime(logPath) : DateTime.MinValue;
             bool recentlyActive = (DateTime.Now - lastWrite).TotalSeconds < 30;
 
@@ -454,7 +396,7 @@ namespace ReprediTrayDaemon.Services
         // ─────────────────────────────────────────────────────────────
         public async Task<bool> ActualizarBaseDatosAccessAsync()
         {
-            string ps1 = Path.Combine(ProjectRoot, "Scripts", "Migracion", "MigrarYActualizarAccess.ps1");
+            string ps1 = Path.Combine(Config.ScriptsDir, "Migracion", "MigrarYActualizarAccess.ps1");
             if (!File.Exists(ps1))
             {
                 OnProcessOutput?.Invoke(ServiceId.AccessErp,
@@ -480,10 +422,23 @@ namespace ReprediTrayDaemon.Services
                     WorkingDirectory = ProjectRoot
                 };
 
+                // Inyectar variables de entorno para scripts dependientes
+                psi.EnvironmentVariables["PGHOST"] = Config.PostgreSQL.Host;
+                psi.EnvironmentVariables["PGPORT"] = Config.PostgreSQL.Port.ToString();
+                psi.EnvironmentVariables["PGDATABASE"] = Config.PostgreSQL.Database;
+                psi.EnvironmentVariables["PGUSER"] = Config.PostgreSQL.User;
+                psi.EnvironmentVariables["PGCLIENTENCODING"] = Config.PostgreSQL.ClientEncoding;
+                psi.EnvironmentVariables["PSFORCE_LOGS_DIR"] = Config.LogsDir;
+                string pwd = DaemonConfig.GetPostgresPassword();
+                if (!string.IsNullOrEmpty(pwd))
+                {
+                    psi.EnvironmentVariables["PGPASSWORD"] = pwd;
+                    psi.EnvironmentVariables["PGREPREAPIPWD"] = pwd;
+                }
+
                 using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 proc.Start();
 
-                // Leer stdout y stderr asíncronamente para evitar deadlocks y CA2024
                 var stdoutTask = Task.Run(async () =>
                 {
                     string? line;
@@ -527,7 +482,7 @@ namespace ReprediTrayDaemon.Services
 
         public async Task StartAllServicesAsync()
         {
-            OnProcessOutput?.Invoke(ServiceId.Postgres, "--- INICIANDO TODOS LOS SERVICIOS DE REPREDISL V4 ---", false);
+            OnProcessOutput?.Invoke(ServiceId.Postgres, "--- INICIANDO TODOS LOS SERVICIOS DE PSFORCE ---", false);
 
             // PASO 0: Actualizar la base de datos Access antes de arrancar servicios
             bool bdOk = await ActualizarBaseDatosAccessAsync();
@@ -541,10 +496,10 @@ namespace ReprediTrayDaemon.Services
             bool pgOk = await CheckPostgresAsync();
             if (!pgOk)
             {
-                OnProcessOutput?.Invoke(ServiceId.Postgres, "Intentando levantar servicio PostgreSQL...", false);
+                OnProcessOutput?.Invoke(ServiceId.Postgres, $"Intentando levantar servicio PostgreSQL ({Config.PostgreSQL.ServiceName})...", false);
                 try
                 {
-                    var psi = new ProcessStartInfo("net", "start postgresql-x64-16")
+                    var psi = new ProcessStartInfo("net", $"start {Config.PostgreSQL.ServiceName}")
                     {
                         CreateNoWindow = true,
                         UseShellExecute = false,
@@ -619,7 +574,7 @@ namespace ReprediTrayDaemon.Services
                 {
                     FileName = exe,
                     Arguments = $"\"{conf}\"",
-                    WorkingDirectory = Path.GetDirectoryName(conf),
+                    WorkingDirectory = Path.GetDirectoryName(conf) ?? ProjectRoot,
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -627,6 +582,15 @@ namespace ReprediTrayDaemon.Services
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
+
+                // Inyectar puerto y configuración segura en variables de entorno del proceso
+                psi.EnvironmentVariables["PGRST_SERVER_PORT"] = Config.PostgREST.Port.ToString();
+                string pwd = DaemonConfig.GetPostgresPassword();
+                if (!string.IsNullOrEmpty(pwd))
+                {
+                    string host = string.IsNullOrWhiteSpace(Config.PostgreSQL.Host) ? "localhost" : Config.PostgreSQL.Host;
+                    psi.EnvironmentVariables["PGRST_DB_URI"] = $"postgres://authenticator:{pwd}@{host}:{Config.PostgreSQL.Port}/{Config.PostgreSQL.Database}";
+                }
 
                 var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
@@ -638,8 +602,19 @@ namespace ReprediTrayDaemon.Services
 
                 proc.ErrorDataReceived += (s, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data))
-                        OnProcessOutput?.Invoke(ServiceId.Postgrest, $"[PostgREST ERR] {e.Data}", true);
+                    if (string.IsNullOrEmpty(e.Data)) return;
+
+                    // PostgREST escribe todo su log operativo a stderr por diseño estándar de Haskell.
+                    // Solo clasificar como error si el contenido indica un fallo real.
+                    bool isActualError = e.Data.Contains("error:", StringComparison.OrdinalIgnoreCase) ||
+                                         e.Data.Contains("fatal:", StringComparison.OrdinalIgnoreCase) ||
+                                         e.Data.Contains("failed to", StringComparison.OrdinalIgnoreCase) ||
+                                         e.Data.Contains("panic:", StringComparison.OrdinalIgnoreCase) ||
+                                         e.Data.Contains("could not connect", StringComparison.OrdinalIgnoreCase) ||
+                                         e.Data.Contains("connection refused", StringComparison.OrdinalIgnoreCase);
+
+                    string prefix = isActualError ? "[PostgREST ERR]" : "[PostgREST]";
+                    OnProcessOutput?.Invoke(ServiceId.Postgrest, $"{prefix} {e.Data}", isActualError);
                 };
 
                 proc.Exited += (s, e) =>
@@ -654,7 +629,7 @@ namespace ReprediTrayDaemon.Services
                 proc.BeginErrorReadLine();
 
                 activeProcesses[ServiceId.Postgrest] = proc;
-                UpdateServiceState(ServiceId.Postgrest, ServiceStatusState.Activo, $"🟢 Activo (PID {proc.Id}, :3000)", proc.Id);
+                UpdateServiceState(ServiceId.Postgrest, ServiceStatusState.Activo, $"🟢 Activo (PID {proc.Id}, :{Config.PostgREST.Port})", proc.Id);
                 OnProcessOutput?.Invoke(ServiceId.Postgrest, $"[PostgREST] Iniciado con éxito en background (PID {proc.Id})", false);
             }
             catch (Exception ex)
@@ -679,7 +654,6 @@ namespace ReprediTrayDaemon.Services
                 catch { }
             }
 
-            // Also kill any remaining postgrest.exe
             try
             {
                 foreach (var p in Process.GetProcessesByName("postgrest"))
@@ -719,7 +693,7 @@ namespace ReprediTrayDaemon.Services
                 {
                     FileName = caddyBin,
                     Arguments = $"run --config \"{caddyfile}\"",
-                    WorkingDirectory = Path.GetDirectoryName(caddyfile),
+                    WorkingDirectory = Path.GetDirectoryName(caddyfile) ?? ProjectRoot,
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -754,7 +728,7 @@ namespace ReprediTrayDaemon.Services
                 proc.BeginErrorReadLine();
 
                 activeProcesses[ServiceId.Caddy] = proc;
-                UpdateServiceState(ServiceId.Caddy, ServiceStatusState.Activo, $"🟢 Activo (PID {proc.Id}, SSL 443)", proc.Id);
+                UpdateServiceState(ServiceId.Caddy, ServiceStatusState.Activo, $"🟢 Activo (PID {proc.Id}, SSL {Config.Caddy.HttpsPort})", proc.Id);
                 OnProcessOutput?.Invoke(ServiceId.Caddy, $"[Caddy] Iniciado con éxito en background (PID {proc.Id})", false);
             }
             catch (Exception ex)
@@ -779,7 +753,6 @@ namespace ReprediTrayDaemon.Services
                 catch { }
             }
 
-            // Also kill any system caddy.exe
             try
             {
                 foreach (var p in Process.GetProcessesByName("caddy"))
@@ -826,7 +799,7 @@ namespace ReprediTrayDaemon.Services
                 string script = ResolveSyncScript();
                 if (!File.Exists(script))
                 {
-                    OnProcessOutput?.Invoke(ServiceId.SyncPedidos, $"[ERROR] No se encuentra script ni ejecutable de sincronización", true);
+                    OnProcessOutput?.Invoke(ServiceId.SyncPedidos, $"[ERROR] No se encuentra script ni ejecutable de sincronización: {script}", true);
                     UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Error, "Sincronizador no encontrado");
                     return;
                 }
@@ -844,6 +817,20 @@ namespace ReprediTrayDaemon.Services
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
+            }
+
+            // Inyectar variables de proceso seguras
+            psi.EnvironmentVariables["PGHOST"] = Config.PostgreSQL.Host;
+            psi.EnvironmentVariables["PGPORT"] = Config.PostgreSQL.Port.ToString();
+            psi.EnvironmentVariables["PGDATABASE"] = Config.PostgreSQL.Database;
+            psi.EnvironmentVariables["PGUSER"] = Config.PostgreSQL.User;
+            psi.EnvironmentVariables["PGCLIENTENCODING"] = Config.PostgreSQL.ClientEncoding;
+            psi.EnvironmentVariables["PSFORCE_LOGS_DIR"] = Config.LogsDir;
+            string pwd = DaemonConfig.GetPostgresPassword();
+            if (!string.IsNullOrEmpty(pwd))
+            {
+                psi.EnvironmentVariables["PGPASSWORD"] = pwd;
+                psi.EnvironmentVariables["PGREPREAPIPWD"] = pwd;
             }
 
             UpdateServiceState(ServiceId.SyncPedidos, ServiceStatusState.Iniciando, "Iniciando...");
@@ -901,7 +888,6 @@ namespace ReprediTrayDaemon.Services
                 catch { }
             }
 
-            // Also kill any orphaned sincronizador processes
             try
             {
                 foreach (var p in Process.GetProcessesByName("sincronizador"))
@@ -911,7 +897,6 @@ namespace ReprediTrayDaemon.Services
             }
             catch { }
 
-            // Also kill powershell instances running SincronizarPedidosEntrantes
             try
             {
                 var psi = new ProcessStartInfo

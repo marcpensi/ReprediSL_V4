@@ -6,11 +6,11 @@ Option Explicit
 ' CONFIGURACION POSTGRESQL & BACKEND API
 ' =========================================================
 
-Private Const PG_SERVER As String = "localhost"
-Private Const PG_PORT As String = "5432"
-Private Const PG_DATABASE As String = "repredisl_api"
-Private Const PG_USER As String = "postgres"
-Private Const PG_PASSWORD As String = "Marc"
+Private Const PG_SERVER_DEFAULT As String = "localhost"
+Private Const PG_PORT_DEFAULT As String = "5433"
+Private Const PG_DATABASE_DEFAULT As String = "repredisl_api"
+Private Const PG_USER_DEFAULT As String = "postgres"
+Private Const PG_PASSWORD_DEFAULT As String = ""
 Private Const BATCH_SIZE As Long = 500
 
 Private db As Object
@@ -232,15 +232,24 @@ Private Sub RegistrarLogSync(ByVal Mensaje As String)
     Dim fileNum As Integer
     Dim logPath As String
     Dim errLogPath As String
+    Dim logsDir As String
 
-    logPath = CurrentProject.Path & "\sync_progress.log"
+    logsDir = Environ$("PSFORCE_LOGS_DIR")
+    If Len(logsDir) > 0 Then
+        If Right$(logsDir, 1) = "\" Then logsDir = Left$(logsDir, Len(logsDir) - 1)
+        logPath = logsDir & "\sync_progress.log"
+        errLogPath = logsDir & "\sync_errors.log"
+    Else
+        logPath = CurrentProject.Path & "\sync_progress.log"
+        errLogPath = CurrentProject.Path & "\sync_errors.log"
+    End If
+
     fileNum = FreeFile
     Open logPath For Append As #fileNum
     Print #fileNum, "[" & Format$(Now, "hh:nn:ss") & "] " & Mensaje
     Close #fileNum
 
     If (InStr(1, Mensaje, "ERROR IN HANDLER", vbTextCompare) > 0 Or InStr(1, Mensaje, "Fallo", vbTextCompare) > 0) And InStr(1, Mensaje, "DEBUG STEP", vbTextCompare) = 0 Then
-        errLogPath = CurrentProject.Path & "\sync_errors.log"
         fileNum = FreeFile
         Open errLogPath For Append As #fileNum
         Print #fileNum, "[" & Format$(Now, "hh:nn:ss") & "] " & Mensaje
@@ -259,14 +268,33 @@ End Sub
 Private Function AbrirConexionPostgres() As Object
     Dim conexion As Object
     Dim Cadena As String
+    Dim sServer As String, sPort As String, sDatabase As String, sUser As String, sPwd As String
+
+    sServer = Environ$("PGHOST")
+    If Len(sServer) = 0 Then sServer = PG_SERVER_DEFAULT
+
+    sPort = Environ$("PGPORT")
+    If Len(sPort) = 0 Then sPort = PG_PORT_DEFAULT
+
+    sDatabase = Environ$("PGDATABASE")
+    If Len(sDatabase) = 0 Then sDatabase = Environ$("PGDBAPI")
+    If Len(sDatabase) = 0 Then sDatabase = PG_DATABASE_DEFAULT
+
+    sUser = Environ$("PGUSER")
+    If Len(sUser) = 0 Then sUser = PG_USER_DEFAULT
+
+    sPwd = Environ$("PGREPREAPIPWD")
+    If Len(sPwd) = 0 Then sPwd = Environ$("PGPASSWORD")
+    If Len(sPwd) = 0 Then sPwd = PG_PASSWORD_DEFAULT
+
     Set conexion = CreateObject("ADODB.Connection")
 
     Cadena = "Driver={PostgreSQL Unicode};" & _
-             "Server=" & PG_SERVER & ";" & _
-             "Port=" & PG_PORT & ";" & _
-             "Database=" & PG_DATABASE & ";" & _
-             "Uid=" & PG_USER & ";" & _
-             "Pwd=" & PG_PASSWORD & ";"
+             "Server=" & sServer & ";" & _
+             "Port=" & sPort & ";" & _
+             "Database=" & sDatabase & ";" & _
+             "Uid=" & sUser & ";" & _
+             "Pwd=" & sPwd & ";"
 
     conexion.Open Cadena
     Set AbrirConexionPostgres = conexion

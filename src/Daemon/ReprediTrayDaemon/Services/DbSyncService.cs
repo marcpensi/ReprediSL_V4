@@ -8,14 +8,12 @@ namespace ReprediTrayDaemon.Services
 {
     public class DbSyncService
     {
-        public string ProjectRoot { get; }
+        public string ProjectRoot => Config.ProjectRoot;
         public string MdbPath { get; private set; } = string.Empty;
-        public string ProgressLogPath { get; }
-        public string AltProgressLogPath { get; }
-        public string ErrorLogPath { get; }
+        public string ProgressLogPath => Config.ProgressLogPath;
+        public string ErrorLogPath => Config.ErrorLogPath;
 
         private long lastReadOffset = 0;
-        private long lastAltReadOffset = 0;
 
         public int ErrorCount { get; private set; } = 0;
         public bool SilenceAlerts { get; set; } = false;
@@ -35,47 +33,16 @@ namespace ReprediTrayDaemon.Services
 
         public DaemonConfig Config { get; }
 
-        public DbSyncService(string projectRoot) : this(DaemonConfig.Load() ?? new DaemonConfig { BaseDir = projectRoot }) { }
+        public DbSyncService(string projectRoot) : this(DaemonConfig.Load()) { }
 
         public DbSyncService(DaemonConfig config)
         {
-            Config = config;
-            ProjectRoot = ResolveFallbackProjectRoot(config.BaseDir);
-            string logsDir = config.ResolveFullPath(config.LogsDir);
-            ProgressLogPath = Path.Combine(logsDir, "sync_progress.log");
-            AltProgressLogPath = Path.Combine(ProjectRoot, "src", "Access", "sync_progress.log");
-            ErrorLogPath = Path.Combine(logsDir, "sync_errors.log");
+            Config = config ?? DaemonConfig.Load();
+            Config.EnsureDirectories();
 
-            MdbPath = config.AccessMdbPath;
+            MdbPath = Config.AccessDbPath;
             ResolveMdbPath();
             InitLogOffsets();
-        }
-
-        private static string ResolveFallbackProjectRoot(string candidate)
-        {
-            if (!string.IsNullOrWhiteSpace(candidate) &&
-                File.Exists(Path.Combine(candidate, "Scripts", "BaseDatos", "EjecutarExportacionAccess.ps1")))
-            {
-                return candidate;
-            }
-
-            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-            while (dir != null)
-            {
-                if (File.Exists(Path.Combine(dir.FullName, "Scripts", "BaseDatos", "EjecutarExportacionAccess.ps1")))
-                {
-                    return dir.FullName;
-                }
-                dir = dir.Parent;
-            }
-
-            string fallback = @"D:\programacio\repredi\ReprediSL_V4";
-            if (Directory.Exists(fallback))
-            {
-                return fallback;
-            }
-
-            return candidate;
         }
 
         public void ResetErrorCounter()
@@ -94,49 +61,19 @@ namespace ReprediTrayDaemon.Services
                     var info = new FileInfo(ProgressLogPath);
                     lastReadOffset = Math.Max(0, info.Length - 5000);
                 }
-                if (File.Exists(AltProgressLogPath))
-                {
-                    var info = new FileInfo(AltProgressLogPath);
-                    lastAltReadOffset = Math.Max(0, info.Length - 5000);
-                }
             }
             catch { }
         }
 
         public string ResolveMdbPath()
         {
-            if (!string.IsNullOrEmpty(Config.AccessMdbPath) && File.Exists(Config.AccessMdbPath))
-            {
-                MdbPath = Config.AccessMdbPath;
-                return MdbPath;
-            }
-
-            string[] candidates = new string[]
-            {
-                @"C:\pensi\psgestw\e0012026\gestion.mdb",
-                Path.Combine(ProjectRoot, "src", "Access", "E0012026", "gestion.mdb"),
-                Path.Combine(ProjectRoot, "src", "Access", "gestion.mdb"),
-                @"C:\PsGest\E0012026\gestion.mdb",
-                Path.Combine(ProjectRoot, "src", "Access", "BdDestino.mdb")
-            };
-
-            foreach (var cand in candidates)
-            {
-                if (File.Exists(cand))
-                {
-                    MdbPath = cand;
-                    return MdbPath;
-                }
-            }
-
-            MdbPath = candidates[0];
+            MdbPath = Config.AccessDbPath;
             return MdbPath;
         }
 
         public void CheckLogFilesForNewLines()
         {
             ReadNewLines(ProgressLogPath, ref lastReadOffset);
-            ReadNewLines(AltProgressLogPath, ref lastAltReadOffset);
         }
 
         private string lastEmittedLine = string.Empty;
@@ -266,7 +203,7 @@ namespace ReprediTrayDaemon.Services
             ResetErrorCounter();
             AppendLog("Iniciando exportacion masiva a PostgreSQL...", LogLevel.Info);
 
-            string scriptPath = Path.Combine(ProjectRoot, "Scripts", "BaseDatos", "EjecutarExportacionAccess.ps1");
+            string scriptPath = Path.Combine(Config.ScriptsDir, "BaseDatos", "EjecutarExportacionAccess.ps1");
             if (!File.Exists(scriptPath))
             {
                 AppendLog($"[ERROR] Script de exportacion no encontrado: {scriptPath}", LogLevel.Error);
@@ -283,6 +220,20 @@ namespace ReprediTrayDaemon.Services
                 RedirectStandardError = true,
                 WorkingDirectory = ProjectRoot
             };
+
+            // Inyectar variables seguras al proceso sin persistir
+            psi.EnvironmentVariables["PGHOST"] = Config.PostgreSQL.Host;
+            psi.EnvironmentVariables["PGPORT"] = Config.PostgreSQL.Port.ToString();
+            psi.EnvironmentVariables["PGDATABASE"] = Config.PostgreSQL.Database;
+            psi.EnvironmentVariables["PGUSER"] = Config.PostgreSQL.User;
+            psi.EnvironmentVariables["PGCLIENTENCODING"] = Config.PostgreSQL.ClientEncoding;
+            psi.EnvironmentVariables["PSFORCE_LOGS_DIR"] = Config.LogsDir;
+            string pwd = DaemonConfig.GetPostgresPassword();
+            if (!string.IsNullOrEmpty(pwd))
+            {
+                psi.EnvironmentVariables["PGPASSWORD"] = pwd;
+                psi.EnvironmentVariables["PGREPREAPIPWD"] = pwd;
+            }
 
             Stopwatch sw = Stopwatch.StartNew();
 

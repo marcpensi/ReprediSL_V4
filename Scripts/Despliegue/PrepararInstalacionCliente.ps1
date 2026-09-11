@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Prepara el paquete de instalación oficial para el cliente en C:\pensi\psforce.
 .DESCRIPTION
@@ -95,33 +95,13 @@ foreach ($target in $rutasDestino) {
     if (Test-Path $postgrestExe) { Copy-Item $postgrestExe $dirDaemon -Force }
     if (Test-Path $postgrestConf) { Copy-Item $postgrestConf $dirDaemon -Force }
 
-    # Generar config.json de ReprediTrayDaemon
-    $daemonConfigJson = @"
-{
-  "appName": "ReprediSL Centro de Control",
-  "version": "4.9.2",
-  "baseDir": "$($target.Replace('\', '\\'))",
-  "accessMdbPath": "C:\\pensi\\psgestw\\e0012026\\gestion.mdb",
-  "syncExecutable": "..\\Sync\\sincronizador.exe",
-  "syncScript": "..\\Sync\\SincronizarPedidosEntrantes.ps1",
-  "syncIntervalSeconds": 3,
-  "caddyExecutable": "..\\Caddy\\caddy.exe",
-  "caddyfile": "..\\Caddy\\Caddyfile",
-  "postgrestExecutable": "postgrest.exe",
-  "postgrestConfig": "postgrest.conf",
-  "logsDir": "..\\Logs",
-  "backupDir": "..\\Backup",
-  "postgresHost": "127.0.0.1",
-  "postgresPort": 5432,
-  "postgresDatabase": "repredisl_api",
-  "postgresUser": "postgres",
-  "postgrestPort": 3000,
-  "caddyPort": 80,
-  "autoStartServices": true
-}
-"@
-    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
-    [System.IO.File]::WriteAllText((Join-Path $dirDaemon "config.json"), $daemonConfigJson, $utf8Bom)
+    # Copiar config.json centralizado a la raiz del target y subdirectorios
+    $rootConfigJson = Join-Path $ProjectRoot "config.json"
+    if (Test-Path $rootConfigJson) {
+        Copy-Item $rootConfigJson (Join-Path $target "config.json") -Force
+        Copy-Item $rootConfigJson (Join-Path $dirDaemon "config.json") -Force
+        Copy-Item $rootConfigJson (Join-Path $dirSync "config.json") -Force
+    }
 
     # Copiar contenido de Sync
     Copy-Item "$tempPublishSync\*" $dirSync -Recurse -Force
@@ -129,20 +109,6 @@ foreach ($target in $rutasDestino) {
     # Copiar script de sincronización a Sync
     $syncScriptSrc = Join-Path $ProjectRoot "Scripts\BaseDatos\SincronizarPedidosEntrantes.ps1"
     Copy-Item $syncScriptSrc $dirSync -Force
-
-    # Generar config.json de Sync
-    $syncConfigJson = @"
-{
-  "accessMdbPath": "C:\\pensi\\psgestw\\e0012026\\gestion.mdb",
-  "logsDir": "..\\Logs",
-  "scriptFile": "SincronizarPedidosEntrantes.ps1",
-  "intervalSeconds": 3,
-  "postgresHost": "127.0.0.1",
-  "postgresPort": 5432,
-  "postgresDatabase": "repredisl_api"
-}
-"@
-    [System.IO.File]::WriteAllText((Join-Path $dirSync "config.json"), $syncConfigJson, $utf8Bom)
 
     # Script para arrancar sincronizador standalone
     $arrancarSyncBat = @"
@@ -152,6 +118,7 @@ cd /d "%~dp0"
 sincronizador.exe -Loop -IntervaloSegundos 3
 pause
 "@
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
     [System.IO.File]::WriteAllText((Join-Path $dirSync "ARRANCAR_SINCRONIZADOR.bat"), $arrancarSyncBat, $utf8Bom)
 
     # Configurar Caddy
@@ -176,7 +143,9 @@ pause
 chcp 65001 > nul
 title ReprediSL - Copia de Seguridad Access
 cd /d "%~dp0"
-set "ORIGEN=C:\pensi\psgestw\e0012026\gestion.mdb"
+for /f "usebackq delims=" %%%%A in (`powershell.exe -NoProfile -Command ^
+  "`$c = Get-Content (Join-Path '%~dp0..' 'config.json') -Raw | ConvertFrom-Json; `$f = 'e{0:D3}{1}' -f `$c.PsGest.Empresa, `$c.PsGest.Ejercicio; Write-Output ('ORIGEN=' + (Join-Path (Join-Path (Join-Path `$c.PensiPath `$c.PsGest.FolderName) `$f) `$c.PsGest.DatabaseFile))"`) do set "%%%%A"
+if "%ORIGEN%"=="" set "ORIGEN=C:\pensi\psgestw\e0012026\gestion.mdb"
 set "DESTINO=%~dp0gestion_%date:~6,4%%date:~3,2%%date:~0,2%_%time:~0,2%%time:~3,2%.mdb"
 set "DESTINO=%DESTINO: =0%"
 

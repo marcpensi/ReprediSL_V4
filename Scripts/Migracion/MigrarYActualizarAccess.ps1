@@ -1,6 +1,6 @@
 param (
-    [string]$DbOrigen  = "C:\pensi\psgestw\e0012026\gestion.mdb",
-    [string]$DbDestino = "C:\pensi\psgestw\e0012026\gestion.mdb",
+    [string]$DbOrigen  = "",
+    [string]$DbDestino = "",
     [string]$DbReferencia = "src/Access/BdNewRepre.mdb",
     [string]$ModuloBas = "src/Access/modActBdApi.bas"
 )
@@ -12,6 +12,28 @@ if (-not $ScriptDir) {
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 }
 $ProjectRoot = (Get-Item (Join-Path $ScriptDir "..\..")).FullName
+
+# Cargar configuracion centralizada PsForce si no se pasan rutas explicitas
+$loaderCandidates = @(
+    (Join-Path $ScriptDir "..\Despliegue\Load-PsForceConfig.ps1"),
+    (Join-Path $ScriptDir "..\Load-PsForceConfig.ps1"),
+    (Join-Path $ScriptDir "Load-PsForceConfig.ps1"),
+    "C:\Pensi\PsForce\Scripts\Despliegue\Load-PsForceConfig.ps1"
+)
+$cfg = $null
+foreach ($cand in $loaderCandidates) {
+    if (Test-Path -LiteralPath $cand) {
+        $cfg = & $cand
+        break
+    }
+}
+
+if (-not $DbOrigen -and $cfg) {
+    $DbOrigen = $cfg.AccessDbPath
+}
+if (-not $DbDestino -and $cfg) {
+    $DbDestino = $cfg.AccessDbPath
+}
 
 function Get-AbsolutePath([string]$path) {
     if ([System.IO.Path]::IsPathRooted($path)) {

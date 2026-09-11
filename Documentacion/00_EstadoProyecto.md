@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
 **Fecha de actualización:** 11-09-2026  
-**Versión:** 4.9.0  
-**Estado General:** Operativo, Auditado y Desplegado en Producción (Consolidación V4.9.0 - Pestaña Productos con Tarifa Activa, Recálculo Dinámico de Serie, Bloqueo de Modificación y Re-sincronización de Pedidos Históricos Sincronizados con psgestw, y Despliegue Hostinger)
+**Versión:** 4.9.4  
+**Estado General:** Operativo, Desacoplado y Auditado (Centralización de configuración en config.json raíz, eliminación completa de hardcodes en C#, PowerShell, VBA y BAT, resolución semántica de logs stderr en PostgREST).
 
 ---
 
@@ -64,6 +64,11 @@
   - Soporte de configuración desacoplada vía `DaemonConfig.cs` en `ReprediTrayDaemon` y `SyncConfig` en `sincronizador.exe`.
   - Automatización con [`PrepararInstalacionCliente.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PrepararInstalacionCliente.ps1), desplegando simultáneamente en `C:\pensi\psforce\` y en el paquete portable [`dist_cliente\ReprediSL\`](file:///d:/programacio/repredi/ReprediSL_V4/dist_cliente/ReprediSL).
   - Documentación detallada en [`MANUAL_INSTALACION_CLIENTE.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/MANUAL_INSTALACION_CLIENTE.md).
+- [x] **Desacoplamiento Total de Hardcodes y Configuración Central (V4.9.4):**
+  - Creación y centralización de la configuración canónica en un único `config.json` en la raíz del proyecto.
+  - Supresión completa de rutas fijas (`D:\programacio\...`, `C:\Pensi\...`), puertos fijos (`5432`/`5433`) y nombres de servicio en C# (`ReprediTrayDaemon`, `ReprediSync`), PowerShell (`Load-PsForceConfig.ps1`, `SincronizarPedidosEntrantes.ps1`, `EjecutarExportacionAccess.ps1`), VBA (`modActBdApi.bas`) y scripts batch (`INICIAR_SYNC.bat`, `ARRANCAR_TODO.bat`, `PARAR.bat`).
+  - Resolución semántica de logs en `stderr` de PostgREST en `ProcessManagerService.cs`, eliminando falsos positivos de error en el Centro de Control.
+  - Regla estricta de seguridad: contraseñas de BD no persistidas en `config.json`, pasadas en memoria mediante `PGREPREAPIPWD`.
 
 ---
 

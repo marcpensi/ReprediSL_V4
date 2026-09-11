@@ -7,15 +7,17 @@ echo =========================================================
 echo.
 echo   Iniciando Centro de Control Unificado...
 echo   Servicios gestionados:
-echo     1. PostgreSQL 16 (Puerto 5432 / repredisl_api)
-echo     2. PostgREST API (Puerto 3000)
-echo     3. Caddy Reverse Proxy (HTTPS 443 / SSL)
+echo     1. PostgreSQL
+echo     2. PostgREST API
+echo     3. Caddy Reverse Proxy
 echo     4. Sincronizador de Pedidos (Access ERP)
 echo.
 
 set "DAEMON_EXE=%~dp0..\..\src\Daemon\bin\ReprediTrayDaemon.exe"
+if not exist "%DAEMON_EXE%" set "DAEMON_EXE=%~dp0..\..\src\Daemon\ReprediTrayDaemon\bin\Release\net10.0-windows\ReprediTrayDaemon.exe"
+if not exist "%DAEMON_EXE%" set "DAEMON_EXE=%~dp0..\..\ReprediTrayDaemon\ReprediTrayDaemon.exe"
 if not exist "%DAEMON_EXE%" (
-    echo [ERROR] No se encuentra %DAEMON_EXE%
+    echo [ERROR] No se encuentra ReprediTrayDaemon.exe
     echo Ejecuta: dotnet build "%~dp0..\..\src\Daemon\ReprediTrayDaemon\ReprediTrayDaemon.csproj"
     pause
     exit /b 1

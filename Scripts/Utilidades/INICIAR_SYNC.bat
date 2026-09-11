@@ -14,21 +14,29 @@ rem   3. Caddy (puertos 80/443)
 rem   4. Sincronizador
 rem ============================================================
 
-set "ROOT=C:\Pensi\PsForce"
-set "PG_BIN=C:\Program Files\PostgreSQL\17\bin"
-set "PG_SERVICE=postgresql-x64-17"
-set "PG_PORT=5433"
+rem Resolver configuracion dinamicamente desde config.json
+for /f "usebackq delims=" %%A in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$l = Join-Path '%~dp0' '..\Despliegue\Load-PsForceConfig.ps1'; if (-not (Test-Path $l)) { $l = Join-Path '%~dp0' '..\..\Scripts\Despliegue\Load-PsForceConfig.ps1' }; $c = & $l; Write-Output ('ROOT=' + $c.ProjectRoot); Write-Output ('PG_PORT=' + $c.PostgreSQL.Port); Write-Output ('PG_SERVICE=' + $c.PostgreSQL.ServiceName); if ($c.PostgreSQL.PsqlExe) { Write-Output ('PG_BIN=' + (Split-Path -Parent $c.PostgreSQL.PsqlExe)) }; Write-Output ('POSTGREST_PORT=' + $c.PostgREST.Port);"`) do (
+    set "%%A"
+)
+
+if "%ROOT%"=="" set "ROOT=%~dp0..\.."
+if "%PG_PORT%"=="" set "PG_PORT=5433"
+if "%PG_SERVICE%"=="" set "PG_SERVICE=postgresql-x64-17"
+if "%POSTGREST_PORT%"=="" set "POSTGREST_PORT=3000"
 
 set "POSTGREST_DIR=%ROOT%\ReprediTrayDaemon"
+if not exist "%POSTGREST_DIR%" set "POSTGREST_DIR=%ROOT%\src\API"
 set "POSTGREST_EXE=%POSTGREST_DIR%\postgrest.exe"
 set "POSTGREST_CONF=%POSTGREST_DIR%\postgrest.conf"
-set "POSTGREST_PORT=3000"
 
 set "CADDY_DIR=%ROOT%\Caddy"
+if not exist "%CADDY_DIR%" set "CADDY_DIR=%ROOT%\src\API"
 set "CADDY_EXE=%CADDY_DIR%\caddy.exe"
 set "CADDY_CONF=%CADDY_DIR%\Caddyfile"
 
 set "SYNC_DIR=%ROOT%\Sync"
+if not exist "%SYNC_DIR%" set "SYNC_DIR=%ROOT%\src\Sync\ReprediSync\bin\Release\net10.0-windows"
 set "SYNC_EXE=%SYNC_DIR%\sincronizador.exe"
 
 echo ============================================================
@@ -39,13 +47,16 @@ echo.
 rem ------------------------------------------------------------
 rem 0. PATH PostgreSQL / libpq.dll
 rem ------------------------------------------------------------
+if "%PG_BIN%"=="" (
+    for /d %%D in ("C:\Program Files\PostgreSQL\*") do (
+        if exist "%%D\bin\libpq.dll" set "PG_BIN=%%D\bin"
+    )
+)
 if exist "%PG_BIN%\libpq.dll" (
     set "PATH=%PG_BIN%;%PATH%"
-    echo [OK] PostgreSQL BIN agregado al PATH de esta sesion.
+    echo [OK] PostgreSQL BIN agregado al PATH de esta sesion: %PG_BIN%
 ) else (
-    echo [ERROR] No se encuentra:
-    echo         %PG_BIN%\libpq.dll
-    goto :ERROR
+    echo [AVISO] No se encuentra libpq.dll en PostgreSQL bin; continuando con PATH del sistema.
 )
 
 rem ------------------------------------------------------------

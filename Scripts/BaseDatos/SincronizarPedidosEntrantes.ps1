@@ -1,18 +1,10 @@
-﻿param (
+param (
     [switch]$Loop = $false,
-    [int]$IntervaloSegundos = 3
+    [int]$IntervaloSegundos = 3,
+    [string]$ConfigFilePath = ""
 )
 
 $ErrorActionPreference = "Stop"
-
-# PostgreSQL PsForce
-$env:PGUSER = "postgres"
-$env:PGHOST = "localhost"
-$env:PGPORT = "5433"
-$env:PGDBAPI = "repredi-api"
-$env:PGCLIENTENCODING = "UTF8"
-
-$env:PGPASSWORD = $env:PGREPREAPIPWD # psql/libpq solo reconoce PGPASSWORD
 
 # Consola UTF-8
 [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
@@ -23,32 +15,41 @@ $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) {
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 }
-$ProjectRoot = "C:\Pensi\PsForce"
 
-# Carpeta centralizada de logs PsForce
-$logPath = Join-Path $ProjectRoot "Logs"
-if (-not (Test-Path -LiteralPath $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+# Cargar configuracion centralizada PsForce
+$loaderCandidates = @(
+    (Join-Path $ScriptDir "..\Despliegue\Load-PsForceConfig.ps1"),
+    (Join-Path $ScriptDir "..\Load-PsForceConfig.ps1"),
+    (Join-Path $ScriptDir "Load-PsForceConfig.ps1"),
+    "C:\Pensi\PsForce\Scripts\Despliegue\Load-PsForceConfig.ps1"
+)
+$cfg = $null
+foreach ($cand in $loaderCandidates) {
+    if (Test-Path -LiteralPath $cand) {
+        $cfg = & $cand -ConfigFile $ConfigFilePath
+        break
+    }
+}
+if (-not $cfg) {
+    throw "No se pudo cargar la configuración de PsForce mediante Load-PsForceConfig.ps1."
 }
 
+$ProjectRoot = $cfg.ProjectRoot
+
+# Carpeta centralizada de logs PsForce
+$logPath = $cfg.LogsPath
 $logSyncFile       = Join-Path $logPath "sync_progress.log"
 $logErrorsFile     = Join-Path $logPath "errors.log"
 $logPendientesFile = Join-Path $logPath "pedidos_pendientes.log"
 $logDescartadosFile = Join-Path $logPath "pedidos_descartados.log"
 
 # PostgreSQL PsForce
-$Psql = "C:\Program Files\PostgreSQL\17\bin\psql.exe"
-if (-not (Test-Path -LiteralPath $Psql)) {
-    throw "No se encuentra PostgreSQL 17: $Psql"
+$Psql = $cfg.PostgreSQL.PsqlExe
+if (-not $Psql -or -not (Test-Path -LiteralPath $Psql)) {
+    throw "No se encuentra el ejecutable psql.exe de PostgreSQL."
 }
 
-$pathMdb = "C:\PENSI\PSGESTW\E0012026\gestion.mdb"
-if (-not (Test-Path -LiteralPath $pathMdb)) {
-    $pathMdb = Join-Path $ProjectRoot "Test\E0012026\gestion.mdb"
-}
-if (-not (Test-Path -LiteralPath $pathMdb)) {
-    $pathMdb = Join-Path $ProjectRoot "Test\gestion.mdb"
-}
+$pathMdb = $cfg.AccessDbPath
 
 function Write-LogFile([string]$FilePath, [string]$Message) {
     try {
@@ -168,7 +169,7 @@ WHERE estado = 'N' AND synced_at IS NULL
 ORDER BY id ASC;
 "@
 
-    $rows = & $Psql -X -v ON_ERROR_STOP=1 -h $env:PGHOST -p $env:PGPORT -U postgres -d repredisl_api `
+    $rows = & $Psql -X -v ON_ERROR_STOP=1 -h $cfg.PostgreSQL.Host -p $cfg.PostgreSQL.Port -U $cfg.PostgreSQL.User -d $cfg.PostgreSQL.Database `
         -t -A -F "`t" -c $sqlSelect
 
     if ($LASTEXITCODE -ne 0) {
@@ -397,7 +398,7 @@ SET estado = 'S', synced_at = NOW()
 WHERE id = $idPg AND estado = 'N' AND synced_at IS NULL;
 "@
 
-            & $Psql -X -v ON_ERROR_STOP=1 -h $env:PGHOST -p $env:PGPORT -U postgres -d repredisl_api `
+            & $Psql -X -v ON_ERROR_STOP=1 -h $cfg.PostgreSQL.Host -p $cfg.PostgreSQL.Port -U $cfg.PostgreSQL.User -d $cfg.PostgreSQL.Database `
                 -c $sqlUpdate | Out-Null
 
             if ($LASTEXITCODE -ne 0) {

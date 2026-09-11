@@ -1,0 +1,25 @@
+{
+  "PensiPath": "C:\\Pensi",
+  "ProjectName": "PsForce",
+  "PsGest": {
+    "FolderName": "PsGestw",
+    "Empresa": 1,
+    "Ejercicio": 2026,
+    "DatabaseFile": "gestion.mdb"
+  },
+  "PostgreSQL": {
+    "Host": "localhost",
+    "Port": 5433,
+    "Database": "repredisl_api",
+    "User": "postgres",
+    "ClientEncoding": "UTF8",
+    "ServiceName": "postgresql-x64-17"
+  },
+  "PostgREST": {
+    "Port": 3000
+  },
+  "Caddy": {
+    "HttpPort": 80,
+    "HttpsPort": 443
+  }
+}

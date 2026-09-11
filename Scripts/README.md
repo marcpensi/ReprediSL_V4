@@ -81,4 +81,7 @@ Este directorio contiene la suite de scripts utilitarios y de automatización pa
 ### 15. [`PrepararInstalacionCliente.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PrepararInstalacionCliente.ps1)
 - **Objetivo:** Automatiza la compilación en modo Release de `ReprediTrayDaemon` y `sincronizador.exe`, empaquetando y generando la estructura oficial del cliente en `C:\pensi\psforce\` y el paquete portable en `dist_cliente\ReprediSL\`. Incluye ejecutables, DLLs, configuraciones (`config.json`), binarios de Caddy/PostgREST, carpetas de Logs y Backup, y scripts de arranque y creación de accesos directos.
 
+### 16. [`Load-PsForceConfig.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/Load-PsForceConfig.ps1)
+- **Objetivo:** Cargador centralizado de configuración dinámica para la suite de scripts de PowerShell y batch. Localiza y analiza el archivo `config.json` de la raíz, deriva rutas operativas (`ProjectRoot`, `AccessDbPath`, `LogsPath`, etc.) y exporta en memoria las variables de entorno de PostgreSQL (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PSFORCE_LOGS_DIR`), eliminando cualquier valor hardcodeado.
+
 

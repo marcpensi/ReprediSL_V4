@@ -17,25 +17,27 @@ function Get-AbsolutePath([string]$path) {
     return [System.IO.Path]::GetFullPath((Join-Path $ProjectRoot $path))
 }
 
-# Resolucion dinamica de la ruta gestion.mdb (donde entran y se confirman los pedidos)
-if (-not $DbMdb -or $DbMdb -eq "src/Access/BdDestino.mdb") {
-    $candidatos = @(
-        "C:\pensi\psgestw\e0012026\gestion.mdb",
-        (Join-Path $ProjectRoot "src/Access/E0012026/gestion.mdb"),
-        (Join-Path $ProjectRoot "src/Access/gestion.mdb"),
-        "C:\PsGest\E0012026\gestion.mdb",
-        (Join-Path $ProjectRoot "src/Access/BdDestino.mdb")
-    )
-    foreach ($cand in $candidatos) {
-        if (Test-Path $cand) {
-            $DbMdb = $cand
-            break
-        }
+# Cargar configuracion centralizada PsForce
+$loaderCandidates = @(
+    (Join-Path $ScriptDir "..\Despliegue\Load-PsForceConfig.ps1"),
+    (Join-Path $ScriptDir "..\Load-PsForceConfig.ps1"),
+    (Join-Path $ScriptDir "Load-PsForceConfig.ps1"),
+    "C:\Pensi\PsForce\Scripts\Despliegue\Load-PsForceConfig.ps1"
+)
+$cfg = $null
+foreach ($cand in $loaderCandidates) {
+    if (Test-Path -LiteralPath $cand) {
+        $cfg = & $cand
+        break
     }
 }
 
+if (-not $DbMdb -and $cfg) {
+    $DbMdb = $cfg.AccessDbPath
+}
+
 $pathMdb = Get-AbsolutePath $DbMdb
-$logPath = Join-Path $ProjectRoot "src/Access/sync_progress.log"
+$logPath = if ($cfg) { Join-Path $cfg.LogsPath "sync_progress.log" } else { Join-Path $ProjectRoot "Logs\sync_progress.log" }
 
 Write-Host "=========================================================" -ForegroundColor Cyan
 Write-Host " EJECUTOR DE EXPORTACION ACCESS -> POSTGRESQL (EXTERNO)" -ForegroundColor Cyan
