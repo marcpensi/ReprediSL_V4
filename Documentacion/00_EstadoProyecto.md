@@ -64,11 +64,13 @@
   - Soporte de configuración desacoplada vía `DaemonConfig.cs` en `ReprediTrayDaemon` y `SyncConfig` en `sincronizador.exe`.
   - Automatización con [`PrepararInstalacionCliente.ps1`](file:///d:/programacio/repredi/ReprediSL_V4/Scripts/Despliegue/PrepararInstalacionCliente.ps1), desplegando simultáneamente en `C:\pensi\psforce\` y en el paquete portable [`dist_cliente\ReprediSL\`](file:///d:/programacio/repredi/ReprediSL_V4/dist_cliente/ReprediSL).
   - Documentación detallada en [`MANUAL_INSTALACION_CLIENTE.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/MANUAL_INSTALACION_CLIENTE.md).
-- [x] **Desacoplamiento Total de Hardcodes y Configuración Central (V4.9.4):**
-  - Creación y centralización de la configuración canónica en un único `config.json` en la raíz del proyecto.
-  - Supresión completa de rutas fijas (`D:\programacio\...`, `C:\Pensi\...`), puertos fijos (`5432`/`5433`) y nombres de servicio en C# (`ReprediTrayDaemon`, `ReprediSync`), PowerShell (`Load-PsForceConfig.ps1`, `SincronizarPedidosEntrantes.ps1`, `EjecutarExportacionAccess.ps1`), VBA (`modActBdApi.bas`) y scripts batch (`INICIAR_SYNC.bat`, `ARRANCAR_TODO.bat`, `PARAR.bat`).
+- [x] **Desacoplamiento Total de Hardcodes, Transición a TrayDaemon y Limpieza (V4.9.4):**
+  - Creación y centralización de la configuración canónica en un único `config.json` en la raíz del proyecto, incluyendo secciones completas para `PostgREST` (host, puerto, esquemas, rol anónimo, db-uri, orígenes CORS) y `Caddy` (dominio, reverse proxy host/puerto).
+  - Supresión completa de rutas fijas (`D:\programacio\...`, `C:\Pensi\...`), puertos fijos (`5432`/`5433`) y nombres de servicio en C# (`TrayDaemon`, `ReprediSync`), PowerShell (`Load-PsForceConfig.ps1`, `SincronizarPedidosEntrantes.ps1`, `EjecutarExportacionAccess.ps1`), VBA (`modActBdApi.bas`) y scripts batch (`ARRANCAR_TODO.bat`, `PARAR.bat`).
+  - Estandarización del binario del demonio como `src/Daemon/TrayDaemon/TrayDaemon.exe` (eliminando redundancias de nombres y carpetas bin intermedias).
   - Resolución semántica de logs en `stderr` de PostgREST en `ProcessManagerService.cs`, eliminando falsos positivos de error en el Centro de Control.
   - Regla estricta de seguridad: contraseñas de BD no persistidas en `config.json`, pasadas en memoria mediante `PGREPREAPIPWD`.
+  - Auditoría y saneamiento del directorio `src/Access`: compresión de `GESTION_ORIGEN.MDB` en `GESTION_ORIGEN.zip` (ahorro de espacio), eliminación de archivos temporales/duplicados (`GESTION_ACTUAL.MDB`, `.ldb`) y confirmación de `E0012026/gestion.mdb` como base canónica activa con las 5 consultas `Qry*Api`.
 
 ---
 
