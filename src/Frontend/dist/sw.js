@@ -1,4 +1,4 @@
-const CACHE_NAME = 'repredisl-v4-cache-v4';
+const CACHE_NAME = 'repredisl-v5-cache';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -20,6 +20,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
+            console.log('Eliminando caché antigua:', cache);
             return caches.delete(cache);
           }
         })

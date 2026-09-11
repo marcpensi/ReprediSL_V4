@@ -141,28 +141,29 @@ export async function syncCachedClientsApi(codes, { signal } = {}) {
 // --- Productos ---
 export function normalizeProduct(row) {
   const code = String(apiValue(row, 'codigo', 'id_producto', 'code', 'id') ?? '').trim();
-  const name = String(apiValue(row, 'nombre', 'descripcion', 'name') ?? '').trim();
+  const name = String(apiValue(row, 'descripcion', 'nombre', 'name') ?? '').trim();
   const priceVal = apiValue(row, 'precio_venta', 'precio', 'price');
-  const price = priceVal !== '' && priceVal !== null && priceVal !== undefined ? Number(priceVal) : 0;
+  const price = (priceVal !== '' && priceVal !== null && priceVal !== undefined && !isNaN(Number(priceVal))) ? Number(priceVal) : null;
   const boxVal = apiValue(row, 'unidades_caja', 'caja', 'box');
-  const box = boxVal !== '' && boxVal !== null && boxVal !== undefined ? Number(boxVal) : 24;
-  const defaultQty = apiValue(row, 'defaultqty', 'cantidad_defecto') ? Number(apiValue(row, 'defaultqty')) : (box || null);
-  const stockVal = apiValue(row, 'stock', 'existencias');
-  const stock = stockVal !== '' && stockVal !== null && stockVal !== undefined ? Number(stockVal) : 100;
+  const box = (boxVal !== '' && boxVal !== null && boxVal !== undefined && !isNaN(Number(boxVal)) && Number(boxVal) > 0) ? Number(boxVal) : null;
+  const stockVal = apiValue(row, 'existencias', 'stock');
+  const stock = (stockVal !== '' && stockVal !== null && stockVal !== undefined && !isNaN(Number(stockVal))) ? Number(stockVal) : null;
+  const tarifaId = apiValue(row, 'id_tarifa', 'tarifa');
 
   return {
-    code: code || `PROD_${Math.random().toString(36).substring(2, 7)}`,
-    name: name || `Producto ${code}`,
-    price: isNaN(price) ? 0 : price,
-    box: isNaN(box) || box <= 0 ? 24 : box,
-    defaultQty,
-    stock: isNaN(stock) ? 0 : stock
+    code,
+    name: name || (code ? `Producto ${code}` : ''),
+    price,
+    box,
+    stock,
+    tarifaId: tarifaId ? Number(tarifaId) : null
   };
 }
 
-export async function loadProductsApi({ signal } = {}) {
+export async function loadProductsApi(tarifaId, { signal } = {}) {
   const table = CONFIG.CATALOGO_TABLE || 'catalogo';
-  const url = `${API_URL}/${table}?limit=${CONFIG.PRODUCTOS_LIMIT}`;
+  const tarifaQuery = tarifaId != null ? `id_tarifa=eq.${encodeURIComponent(tarifaId)}&` : '';
+  const url = `${API_URL}/${table}?${tarifaQuery}order=codigo.asc&limit=${CONFIG.PRODUCTOS_LIMIT}`;
   const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -170,13 +171,47 @@ export async function loadProductsApi({ signal } = {}) {
   return data.map(normalizeProduct).filter(p => p.code);
 }
 
-export async function loadTarifasApi(idTarifa, { signal } = {}) {
-  if (!idTarifa) return [];
-  const url = `${API_URL}/tarifas?id_tarifa=eq.${encodeURIComponent(idTarifa)}`;
+export async function fetchSingleProductApi(code, tarifaId, { signal } = {}) {
+  if (!code) return null;
+  const table = CONFIG.CATALOGO_TABLE || 'catalogo';
+  const tarifaQuery = tarifaId != null ? `&id_tarifa=eq.${encodeURIComponent(tarifaId)}` : '';
+  const url = `${API_URL}/${table}?codigo=eq.${encodeURIComponent(code)}${tarifaQuery}&limit=1`;
   const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const data = await response.json();
-  return Array.isArray(data) ? data : [];
+  if (!Array.isArray(data) || data.length === 0) return null;
+  return normalizeProduct(data[0]);
+}
+
+// --- Tarifas ---
+export async function loadTarifasApi({ signal } = {}) {
+  const url = `${API_URL}/${CONFIG.TARIFAS_TABLE || 'tarifas'}?order=id_tarifa.asc`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  if (!Array.isArray(data)) return [];
+  return data.map(r => ({
+    id: Number(r.id_tarifa),
+    name: String(r.nombre_tarifa || '').trim()
+  })).filter(t => !isNaN(t.id));
+}
+
+// --- Vendedores ---
+export async function loadVendedoresApi({ signal } = {}) {
+  const url = `${API_URL}/${CONFIG.VENDEDORES_TABLE || 'vendedores'}?order=id_vendedor.asc`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  if (!Array.isArray(data)) return [];
+  return data.map(r => {
+    const code = Number(r.id_vendedor);
+    const name = String(r.nombre_vendedor || '').trim();
+    return {
+      code,
+      name,
+      series: code === 13 ? 'VD' : (name.substring(0, 2).toUpperCase() || 'VD')
+    };
+  }).filter(v => !isNaN(v.code));
 }
 
 // --- Historial de ventas ---
@@ -197,12 +232,52 @@ export async function loadHistorialVentasApi(clienteCode, { signal } = {}) {
   const data = await response.json();
   if (!Array.isArray(data)) return [];
 
-  return data.map(normalizeHistorial).filter(Boolean);
+  const normalized = data.map(normalizeHistorial).filter(Boolean);
+  // Mantener solo la compra más reciente por producto
+  const byProduct = new Map();
+  for (const item of normalized) {
+    if (!byProduct.has(item.productoCode)) {
+      byProduct.set(item.productoCode, item);
+    }
+  }
+  return Array.from(byProduct.values());
 }
 
-// --- Pedidos ---
+// --- Numeración de pedidos por serie ---
+export async function getMaxOrderNumberApi(serie, { signal } = {}) {
+  if (!serie) return 0;
+  const cleanSerie = String(serie).trim().toUpperCase();
+  try {
+    const fetchMaxFromTable = async (tableName) => {
+      try {
+        const url = `${API_URL}/${tableName}?serie=eq.${encodeURIComponent(cleanSerie)}&select=numero_pedido&order=numero_pedido.desc&limit=1`;
+        const res = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+        if (!res.ok) return 0;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0 && data[0]?.numero_pedido != null) {
+          return Number(data[0].numero_pedido) || 0;
+        }
+        return 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    const [maxNuevos, maxPedidos] = await Promise.all([
+      fetchMaxFromTable('pedidos_nuevos'),
+      fetchMaxFromTable('pedidos')
+    ]);
+
+    return Math.max(maxNuevos, maxPedidos);
+  } catch (err) {
+    console.warn('Error consultando número máximo para serie:', cleanSerie, err);
+    return 0;
+  }
+}
+
+// --- Creación de pedidos ---
 export async function createOrderApi(orderPayload, { signal } = {}) {
-  const url = `${API_URL}/pedidos`;
+  const url = `${API_URL}/${CONFIG.PEDIDOS_TABLE || 'pedidos_nuevos'}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -218,4 +293,40 @@ export async function createOrderApi(orderPayload, { signal } = {}) {
   }
   const data = await response.json();
   return Array.isArray(data) ? data[0] : data;
+}
+
+// --- Consulta de pedidos (histórico y sincronizados) ---
+export async function loadOrdersApi(sellerId, { signal } = {}) {
+  try {
+    const url = `${API_URL}/${CONFIG.PEDIDOS_TABLE || 'pedidos_nuevos'}?${sellerId ? `id_vendedor=eq.${encodeURIComponent(sellerId)}&` : ''}order=id.desc&limit=50`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+    if (!response.ok) return [];
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+    return data.map(p => ({
+      id: p.id,
+      id_servidor: p.id,
+      series: p.serie || 'VD',
+      number: p.numero_pedido,
+      date: p.fecha ? new Date(p.fecha).toLocaleDateString('es-ES') : '',
+      clientCode: p.id_cliente,
+      clientName: p.cliente,
+      sellerName: p.vendedor,
+      sellerId: p.id_vendedor,
+      total: Number(p.total) || 0,
+      status: p.estado === 'S' ? 'Sincronizado' : (p.synced_at ? 'Sincronizado' : 'Enviado'),
+      estado: 'sincronizado',
+      readonly: true,
+      isHistorical: true,
+      lines: Array.isArray(p.lineas) ? p.lineas.map(l => ({
+        code: l.code,
+        name: l.desc || l.name,
+        qty: Number(l.qty) || 0,
+        price: Number(l.price) || 0
+      })) : []
+    }));
+  } catch (err) {
+    console.warn('Error cargando pedidos desde PostgREST:', err);
+    return [];
+  }
 }

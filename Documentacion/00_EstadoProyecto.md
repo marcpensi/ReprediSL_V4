@@ -1,8 +1,8 @@
 # Estado del Proyecto - ReprediSL_V4
 
 **Fecha de actualización:** 11-09-2026  
-**Versión:** 4.8.1  
-**Estado General:** Operativo, Auditado y Desplegado en Producción (Consolidación V4.8.1 - Rediseño de KPIs de Procesos Anti-Solapamiento, Responsividad Integral del Centro de Control WinForms C# .NET 10, Auditoría Técnica Completa, Pruebas 5/5 OK y Despliegue en Hostinger)
+**Versión:** 4.9.0  
+**Estado General:** Operativo, Auditado y Desplegado en Producción (Consolidación V4.9.0 - Pestaña Productos con Tarifa Activa, Recálculo Dinámico de Serie, Bloqueo de Modificación y Re-sincronización de Pedidos Históricos Sincronizados con psgestw, y Despliegue Hostinger)
 
 ---
 
@@ -35,6 +35,11 @@
 - [x] **Rediseño de KPIs de Procesos Anti-Solapamiento (V4.8.1):** Rediseño visual de las 5 tarjetas de control de servicios (`PostgreSQL`, `PostgREST API`, `Caddy Proxy`, `Sync Pedidos`, `Access ERP`) con contenedores de iconos independientes (`36x36px`), títulos y subtítulos con desplazamiento seguro (`X = 52px`) para eliminar todo recorte o solapamiento, y botones de control de 72px («⏹️ Parar», «▶️ Iniciar») completamente legibles.
 - [x] **Responsividad Total del Centro de Control C# WinForms (V4.8.1):** Implementación de cuadrícula `TableLayoutPanel` (5 columnas proporcionales del 20%) y controlador de eventos `UpdateResponsiveLayout` para escalado dinámico de los 8 contenedores principales ante cualquier ancho de pantalla o redimensionamiento de ventana.
 - [x] **Auditoría Integral del Proyecto (V4.8.1):** Elaboración del informe técnico oficial [`AUDITORIA_V4.md`](file:///d:/programacio/repredi/ReprediSL_V4/Documentacion/AUDITORIA_V4.md) documentando qué hace el proyecto, qué no hace y los objetivos conseguidos.
+- [x] **Productos con Tarifa Activa, Recálculo de Serie y Protección de Históricos Sincronizados (V4.9.0):**
+  - Renombramiento de Catálogo a "Productos" en navegación y vistas, integrando visualización de la tarifa activa configurada en el terminal (`tarifa_1`, etc.).
+  - Recálculo dinámico e instantáneo del último número de pedido al cambiar la serie o el vendedor en la configuración, consultando el máximo real entre `pedidos_nuevos`, `pedidos` y los pedidos locales pendientes en IndexedDB.
+  - Protección estricta de pedidos sincronizados con central/psgestw: se presentan con distintivo `🔒 Pedido sincronizado con central (Histórico · Solo lectura)`, quedan completamente bloqueados contra modificaciones y se excluyen de forma permanente de cualquier proceso de re-sincronización.
+  - Despliegue en producción completado con éxito en Hostinger (`pedidos.repredisl.com`) y PostgREST activo en `api.repredisl.com`.
 
 ---
 

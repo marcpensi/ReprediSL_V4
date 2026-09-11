@@ -538,3 +538,376 @@
   border: 1px solid #ced4da !important;
   cursor: not-allowed;
 }
+
+/* === DISENO DE LINEAS DE PEDIDO (VALIDADAS Y PENDIENTES) === */
+.line {
+  background: white;
+  border: 1px solid var(--line, #dedfe2);
+  border-radius: 14px;
+  margin: 10px 0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.line.line-validated {
+  background: #f8fdf9;
+  border: 1.5px solid #28a745;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.08);
+}
+
+.line.line-pending {
+  background: white;
+  border: 1px solid var(--line, #dedfe2);
+}
+
+.lineHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.lineTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #111;
+}
+
+.lineBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.lineBadge.validated {
+  background: #d4edda;
+  color: #155724;
+}
+
+.lineBadge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.lineSub {
+  font-size: 13px;
+  color: var(--muted, #777d86);
+  margin-bottom: 2px;
+}
+
+.lineHistory {
+  font-size: 12px;
+  color: #495057;
+  background: #f1f3f5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin: 4px 0;
+}
+
+.lineStock {
+  font-size: 12px;
+  color: #2b8a3e;
+  font-weight: 600;
+}
+
+.lineControlRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f3f5;
+}
+
+.lineUnitsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lineUnitsWrapper label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.lineQtyInput {
+  width: 76px;
+  height: 40px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  color: #111;
+  background: white;
+}
+
+.lineQtyInput:focus {
+  border-color: #28a745;
+  outline: none;
+}
+
+.lineButtonsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btnOk {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1.5px solid #28a745;
+  background: white;
+  color: #28a745;
+  font-weight: 700;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btnOk:hover {
+  background: #e8f5e9;
+}
+
+.btnOk.active {
+  background: #28a745;
+  color: white;
+}
+
+.btnRemoveLine {
+  width: 38px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  background: #f8f9fa;
+  color: #868e96;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btnRemoveLine:hover {
+  background: #ffe3e3;
+  color: #e03131;
+  border-color: #ffa8a8;
+}
+
+.btnRemoveLine svg {
+  width: 18px;
+  height: 18px;
+}
+
+.badge-pending-sync {
+  background: #ffec99;
+  color: #e67700;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+/* ========================================================== */
+/* === LÍNEAS DE PEDIDO (pantallalineaspedidos.png) ========== */
+/* ========================================================== */
+.orderLineCard {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 16px 14px;
+  transition: background 0.15s ease;
+}
+
+.orderLineCard:last-child {
+  border-bottom: none;
+}
+
+.line-validated {
+  background: #ffffff;
+}
+
+.line-pending {
+  background: #fffdf5;
+}
+
+.lineMainRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lineInfoCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineProdName {
+  margin: 0 0 2px 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lineProdCode {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.linePriceRow {
+  font-size: 0.88rem;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.linePriceRow b {
+  color: #0f172a;
+}
+
+.lineStockRow {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.lineHistorySub {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.lineControlCol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lineQtyPill {
+  display: inline-flex;
+  align-items: center;
+  border: 2px solid #2f54eb;
+  border-radius: 12px;
+  padding: 4px 8px;
+  background: #ffffff;
+  gap: 4px;
+}
+
+.qtyInputPill {
+  width: 44px;
+  border: none;
+  outline: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: right;
+  background: transparent;
+  color: #0f172a;
+}
+
+.qtyUdText {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.lineBtnPillGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btnPillOk {
+  min-width: 58px;
+  height: 32px;
+  border: 2px solid #28a745;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #28a745;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btnPillOk:hover {
+  background: #e8f5e9;
+}
+
+.btnPillOk.validated {
+  background: #28a745;
+  color: #ffffff;
+}
+
+.btnPillDelete {
+  min-width: 58px;
+  height: 32px;
+  border: 2px solid #dc3545;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #dc3545;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btnPillDelete:hover {
+  background: #fee2e2;
+}
+
+/* ========================================================== */
+/* === PANTALLA PRODUCTOS ==================================== */
+/* ========================================================== */
+.productInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.productPriceRow {
+  font-size: 0.95rem;
+  margin: 4px 0 2px;
+  color: #1e293b;
+}
+
+.productPriceTag {
+  font-weight: 600;
+}
+
+.productPriceTag b {
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.productBoxTag {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.addBtn {
+  font-size: 0.88rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}

@@ -8,8 +8,12 @@ async function main() {
   const projectRoot = path.resolve(import.meta.dirname, "../..");
   const distDir = path.join(projectRoot, "src", "Frontend", "dist");
 
-  console.log("Compilando Frontend con npm run build...");
-  execSync("npm run build", { cwd: path.join(projectRoot, "src", "Frontend"), stdio: "inherit" });
+  if (!process.argv.includes("--no-build")) {
+    console.log("Compilando Frontend con npm run build...");
+    execSync("npm run build", { cwd: path.join(projectRoot, "src", "Frontend"), stdio: "inherit" });
+  } else {
+    console.log("Omitiendo compilación (--no-build detectado). Usando 'dist' actual.");
+  }
 
   const zipName = `dist_${Date.now()}.zip`;
   const zipPath = path.join(projectRoot, "src", "Frontend", zipName);
@@ -20,26 +24,36 @@ async function main() {
   console.log("Conectando con Hostinger Hosting MCP...");
   const transport = new StdioClientTransport({
     command: "npx.cmd",
-    args: ["--package=hostinger-api-mcp@latest", "hostinger-hosting-mcp"]
+    args: ["-y", "--prefer-offline", "--package=hostinger-api-mcp", "hostinger-hosting-mcp"],
+    env: {
+      ...process.env,
+      USER_AGENT: "extension;antigravity;1.3.3"
+    }
   });
 
   const client = new Client(
     { name: "repredisl-deployer", version: "1.0.0" },
     { capabilities: {} }
   );
+  client._requestTimeout = 300000;
+  if (client.options) client.options.timeout = 300000;
 
   await client.connect(transport);
   console.log("Conectado con éxito al MCP de Hostinger.");
 
   console.log("Desplegando en pedidos.repredisl.com...");
-  const result = await client.callTool({
-    name: "hosting_deployStaticWebsite",
-    arguments: {
-      domain: "pedidos.repredisl.com",
-      archivePath: zipPath,
-      removeArchive: true
-    }
-  });
+  const result = await client.callTool(
+    {
+      name: "hosting_deployStaticWebsite",
+      arguments: {
+        domain: "pedidos.repredisl.com",
+        archivePath: zipPath,
+        removeArchive: true
+      }
+    },
+    undefined,
+    { timeout: 300000 }
+  );
 
   console.log("Respuesta de Hostinger MCP:");
   console.log(JSON.stringify(result, null, 2));

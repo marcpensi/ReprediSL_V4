@@ -135,22 +135,6 @@ Private Sub ExportarQueryAPostgres(ByVal NombreQuery As String, ByVal NombreTabl
     Dim rsSchema As DAO.Recordset
 
     sqlSource = "SELECT * FROM [" & NombreQuery & "]"
-    If NombreTabla = "catalogo" Then
-        On Error Resume Next
-        Set rsSchema = db.OpenRecordset("SELECT * FROM [" & NombreQuery & "] WHERE 1=0", dbOpenSnapshot)
-        If Err.Number = 0 Then
-            For Each fldCheck In rsSchema.Fields
-                If LCase$(fldCheck.Name) = "tarifa" Or LCase$(fldCheck.Name) = "id_tarifa" Or LCase$(fldCheck.Name) = "codtarifa" Then
-                    sqlSource = "SELECT * FROM [" & NombreQuery & "] WHERE [" & fldCheck.Name & "] = 1"
-                    Exit For
-                End If
-            Next fldCheck
-            rsSchema.Close
-        End If
-        Set rsSchema = Nothing
-        Err.Clear
-        On Error GoTo Err_Handler
-    End If
 
     Set rs = db.OpenRecordset(sqlSource, dbOpenSnapshot)
 

@@ -1172,9 +1172,8 @@ namespace ReprediTrayDaemon
                 if (pnl.Width <= 2 || pnl.Height <= 2) return;
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), cornerRadius);
-                Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(22, 31, 51) : Color.FromArgb(245, 255, 255, 255);
-                Color borderClr = currentTheme == "Oscuro" ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
-                using var fillBrush = new SolidBrush(fillClr);
+                Color fillClr = currentTheme == "Oscuro" ? Color.FromArgb(22, 31, 51) : Color.White;
+                Color borderClr = currentTheme == "Oscuro" ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);using var fillBrush = new SolidBrush(fillClr);
                 using var pen = new Pen(borderClr, 1.5f);
                 e.Graphics.FillPath(fillBrush, path);
                 e.Graphics.DrawPath(pen, path);
@@ -1529,190 +1528,115 @@ namespace ReprediTrayDaemon
         }
 
         private void UpdateStatusLabels()
-        {
-            bool isDark = currentTheme == "Oscuro";
-            if (autoAcceptMode)
-            {
-                btnPillAuto.BackColor = isDark ? Color.FromArgb(234, 88, 12) : Color.FromArgb(99, 102, 241);
-                btnPillAuto.ForeColor = Color.White;
-                btnPillManual.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
-                btnPillManual.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(100, 116, 139);
-            }
-            else
-            {
-                btnPillAuto.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
-                btnPillAuto.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(100, 116, 139);
-                btnPillManual.BackColor = Color.FromArgb(245, 158, 11);
-                btnPillManual.ForeColor = Color.White;
-            }
+{
+    bool isDark = currentTheme == "Oscuro";
+    
+    if (autoAcceptMode)
+    {
+        btnPillAuto.BackColor = isDark ? Color.FromArgb(234, 88, 12) : Color.FromArgb(79, 70, 229); // Índigo fuerte
+        btnPillAuto.ForeColor = Color.White;
+        
+        btnPillManual.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+        btnPillManual.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
+    }
+    else
+    {
+        btnPillAuto.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+        btnPillAuto.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
+        
+        btnPillManual.BackColor = Color.FromArgb(245, 158, 11);
+        btnPillManual.ForeColor = Color.White;
+    }
 
-            if (lblProcessedVal != null) lblProcessedVal.Text = totalRegistrosProcesadosHoy.ToString();
-
-            if (lblPendingVal != null)
-            {
-                lblPendingVal.Text = pedidosPendientesCount.ToString();
-                lblPendingVal.ForeColor = pedidosPendientesCount > 0
-                    ? Color.FromArgb(245, 158, 11)
-                    : (isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42));
-            }
-        }
+    if (lblProcessedVal != null) lblProcessedVal.Text = totalRegistrosProcesadosHoy.ToString();
+    if (lblPendingVal != null)
+    {
+        lblPendingVal.Text = pedidosPendientesCount.ToString();
+        lblPendingVal.ForeColor = pedidosPendientesCount > 0
+            ? Color.FromArgb(245, 158, 11)
+            : (isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42));
+    }
+}
 
         private void ApplyTheme(string theme)
+{
+    currentTheme = theme;
+    GuardarConfiguracionUI();
+
+    bool isDark = currentTheme == "Oscuro";
+
+    // 1. Paletas de Color Refinadas (Mejor contraste)
+    Color bgApp = isDark ? Color.FromArgb(10, 15, 26) : Color.FromArgb(241, 245, 249);
+    Color textMain = isDark ? Color.FromArgb(248, 250, 252) : Color.FromArgb(15, 23, 42);
+    Color textMuted = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
+    Color cardBg = isDark ? Color.FromArgb(22, 31, 51) : Color.White;
+    
+    if (pnlMainContent != null) pnlMainContent.BackColor = bgApp;
+
+    // 2. Método Recursivo para repintar todos los textos según su importancia
+    void UpdateControlColors(Control parent)
+    {
+        foreach (Control c in parent.Controls)
         {
-            currentTheme = theme;
-            GuardarConfiguracionUI();
-
-            bool isDark = currentTheme == "Oscuro";
-
-            if (pnlMainContent != null)
-                pnlMainContent.BackColor = isDark ? Color.FromArgb(10, 15, 26) : Color.FromArgb(238, 242, 255);
-
-            // Header Text Colors
-            if (lblHeaderTitle != null)
-                lblHeaderTitle.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(30, 41, 59);
-
-            if (lblHeaderSubtitle != null)
-                lblHeaderSubtitle.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
-
-            // Services Card Header & Tiles
-            if (lblServicesTitle != null)
-                lblServicesTitle.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(30, 41, 59);
-
-            if (tableServices != null)
+            if (c is Label lbl)
             {
-                foreach (Control c in tableServices.Controls)
+                // Respetar colores de estado fijos (Verde, Rojo, Naranja)
+                if (lbl.ForeColor == Color.FromArgb(34, 197, 94) || // Activo
+                    lbl.ForeColor == Color.FromArgb(245, 158, 11) || // Iniciando/Alerta
+                    lbl.ForeColor == Color.FromArgb(239, 68, 68) || // Error
+                    lbl.ForeColor == Color.FromArgb(248, 113, 113) ||
+                    lbl.ForeColor == Color.FromArgb(220, 38, 38) ||
+                    lbl.ForeColor == Color.FromArgb(57, 255, 20) ||
+                    lbl.ForeColor == Color.FromArgb(21, 128, 61))
                 {
-                    if (c is Panel t)
-                    {
-                        foreach (Control sc in t.Controls)
-                        {
-                            if (sc is Label l && l != lblSvcPgStatus && l != lblSvcPostgrestStatus && l != lblSvcCaddyStatus && l != lblSvcSyncStatus && l != lblSvcAccessStatus)
-                            {
-                                if (l.Font.Bold)
-                                    l.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42);
-                                else
-                                    l.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
-                            }
-                        }
-                        t.Invalidate();
-                    }
+                    // No alterar colores semánticos de estado
+                }
+                else if (lbl.Font.Bold || lbl.Font.Size > 12)
+                {
+                    lbl.ForeColor = textMain; // Títulos principales
+                }
+                else
+                {
+                    lbl.ForeColor = textMuted; // Subtítulos
                 }
             }
-
-            // Mode Switch
-            if (lblModeTag != null)
-                lblModeTag.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
-
-            UpdateStatusLabels();
-
-            // Pipeline Cards
-            if (cardNodePg != null) UpdateNodeCardTheme(cardNodePg, isDark);
-            if (cardNodeBridge != null) UpdateNodeCardTheme(cardNodeBridge, isDark);
-            if (cardNodeAccess != null) UpdateNodeCardTheme(cardNodeAccess, isDark);
-            iconNodePg?.Invalidate();
-            iconNodeBridge?.Invalidate();
-            iconNodeAccess?.Invalidate();
-
-            // Online badge
-            if (pnlOnlineBadge != null)
-            {
-                foreach (Control c in pnlOnlineBadge.Controls)
-                    if (c is Label lbl) lbl.ForeColor = isDark ? Color.FromArgb(57, 255, 20) : Color.FromArgb(21, 128, 61);
-                pnlOnlineBadge.Invalidate();
-            }
-
-            // btnVerPedidos theming
-            if (btnVerPedidos != null)
-            {
-                btnVerPedidos.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249);
-                btnVerPedidos.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
-                btnVerPedidos.FlatAppearance.BorderColor = isDark ? Color.FromArgb(51, 65, 85) : Color.FromArgb(203, 213, 225);
-            }
-
-            // Metric Cards
-            if (pnlMetricCards != null)
-            {
-                foreach (Control col in pnlMetricCards.Controls)
-                {
-                    if (col is Panel card)
-                    {
-                        foreach (Control sub in card.Controls)
-                        {
-                            if (sub is Label lbl)
-                            {
-                                if (lbl == lblPendingVal && pedidosPendientesCount > 0)
-                                {
-                                    lbl.ForeColor = Color.FromArgb(245, 158, 11);
-                                }
-                                else if (lbl.Font.Bold && lbl.Font.Size > 12)
-                                {
-                                    lbl.ForeColor = isDark ? Color.FromArgb(249, 250, 251) : Color.FromArgb(15, 23, 42);
-                                }
-                                else
-                                {
-                                    lbl.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
-                                }
-                            }
-                        }
-                        card.Invalidate();
-                    }
-                }
-            }
-
-            // Sub-Metric Badges
-            if (flowSubMetrics != null)
-            {
-                foreach (Control col in flowSubMetrics.Controls)
-                {
-                    if (col is Panel pill)
-                    {
-                        foreach (Control sub in pill.Controls)
-                        {
-                            if (sub is Label lbl)
-                            {
-                                lbl.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(71, 85, 105);
-                            }
-                        }
-                        pill.Invalidate();
-                    }
-                }
-            }
-
-            // Log Console Header & Control Buttons
-            if (lblConsoleTitle != null)
-                lblConsoleTitle.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(71, 85, 105);
-
-            if (chkAutoscroll != null)
-            {
-                chkAutoscroll.BackColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(234, 88, 12) : Color.FromArgb(30, 41, 59)) : (isAutoscrollEnabled ? Color.FromArgb(219, 234, 254) : Color.FromArgb(241, 245, 249));
-                chkAutoscroll.ForeColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(15, 15, 15) : Color.FromArgb(148, 163, 184)) : (isAutoscrollEnabled ? Color.FromArgb(29, 78, 216) : Color.FromArgb(100, 116, 139));
-            }
-
-            if (btnClearLogView != null)
-            {
-                btnClearLogView.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249);
-                btnClearLogView.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(71, 85, 105);
-            }
-
-            if (lblLogSubBar != null)
-                lblLogSubBar.ForeColor = isDark ? Color.FromArgb(148, 163, 184) : Color.FromArgb(100, 116, 139);
-
-            if (txtLog != null)
-            {
-                txtLog.BackColor = isDark ? Color.FromArgb(10, 14, 23) : Color.FromArgb(248, 250, 252);
-                txtLog.ForeColor = isDark ? Color.FromArgb(226, 232, 240) : Color.FromArgb(15, 23, 42);
-            }
-
-            // Footer Status Bar
-            if (lblFooterServiceInfo != null)
-                lblFooterServiceInfo.ForeColor = isDark ? Color.FromArgb(156, 163, 175) : Color.FromArgb(100, 116, 139);
-
-            if (lblFooterStatusBadge != null)
-                lblFooterStatusBadge.ForeColor = isDark ? Color.FromArgb(74, 222, 128) : Color.FromArgb(21, 128, 61);
-
-            InvalidateChildren(this);
-            this.Invalidate();
+            
+            // Llamada recursiva para entrar en sub-paneles
+            if (c.HasChildren) UpdateControlColors(c);
         }
+    }
+
+    UpdateControlColors(this);
+    UpdateStatusLabels(); // Fuerza actualización de botones de MODO
+
+    // 3. Ajustes específicos de controles con colores propios
+    if (chkAutoscroll != null)
+    {
+        chkAutoscroll.BackColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(234, 88, 12) : Color.FromArgb(30, 41, 59)) : (isAutoscrollEnabled ? Color.FromArgb(219, 234, 254) : Color.FromArgb(226, 232, 240));
+        chkAutoscroll.ForeColor = isDark ? (isAutoscrollEnabled ? Color.FromArgb(15, 15, 15) : textMuted) : (isAutoscrollEnabled ? Color.FromArgb(29, 78, 216) : textMuted);
+    }
+
+    if (btnClearLogView != null)
+    {
+        btnClearLogView.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.FromArgb(226, 232, 240);
+        btnClearLogView.ForeColor = textMuted;
+    }
+
+    if (txtLog != null)
+    {
+        txtLog.BackColor = isDark ? Color.FromArgb(10, 14, 23) : Color.FromArgb(248, 250, 252);
+        txtLog.ForeColor = textMain;
+    }
+
+    if (btnVerPedidos != null)
+    {
+        btnVerPedidos.BackColor = isDark ? Color.FromArgb(30, 41, 59) : Color.White;
+        btnVerPedidos.ForeColor = textMain;
+    }
+
+    InvalidateChildren(this);
+    this.Invalidate();
+}
 
         private void TimerHealth_Tick(object? sender, EventArgs e)
         {
@@ -1776,22 +1700,19 @@ namespace ReprediTrayDaemon
             else
                 pgLastActive = DateTime.Now;
 
-            Color tagColor = (currentTheme == "Oscuro") switch
-            {
-                true => level switch
-                {
-                    DbSyncService.LogLevel.Error => Color.FromArgb(248, 113, 113),   // Coral Red (#F87171)
-                    DbSyncService.LogLevel.Warning => Color.FromArgb(251, 191, 36),  // Amber Gold (#FBBF24)
-                    DbSyncService.LogLevel.Success => Color.FromArgb(192, 132, 252),// Light Purple (#C084FC)
-                    _ => Color.FromArgb(251, 146, 60)                               // Warm Orange (#FB923C)
-                },
-                false => level switch
-                {
-                    DbSyncService.LogLevel.Error => Color.FromArgb(220, 38, 38),   // Red
-                    DbSyncService.LogLevel.Warning => Color.FromArgb(180, 83, 9),  // Amber
-                    DbSyncService.LogLevel.Success => Color.FromArgb(107, 33, 168),// Purple
-                    _ => Color.FromArgb(30, 64, 175)                               // Blue
-                }
+            Color tagColor = isDark
+            ? level switch {
+                DbSyncService.LogLevel.Error => Color.FromArgb(248, 113, 113),   
+                DbSyncService.LogLevel.Warning => Color.FromArgb(250, 204, 21),  // Amarillo más brillante
+                DbSyncService.LogLevel.Success => Color.FromArgb(167, 139, 250), // Morado más claro y legible
+                _ => Color.FromArgb(96, 165, 250)                               // Azul para Info
+            }
+            : level switch {
+                DbSyncService.LogLevel.Error => Color.FromArgb(220, 38, 38),   
+                DbSyncService.LogLevel.Warning => Color.FromArgb(217, 119, 6),   // Naranja oscuro (evita amarillo sobre blanco)
+                DbSyncService.LogLevel.Success => Color.FromArgb(107, 33, 168),  
+                _ => Color.FromArgb(37, 99, 235)                               // Azul oscuro para Info
+             };
             };
 
             Color bodyTextColor = currentTheme == "Oscuro" ? Color.FromArgb(226, 232, 240) : Color.FromArgb(15, 23, 42);

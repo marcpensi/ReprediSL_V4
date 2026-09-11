@@ -3,9 +3,10 @@ import { CONFIG } from './config';
 const { DB_NAME, DB_VERSION, MAX_CACHE_CLIENTES } = CONFIG;
 const STORE = 'clientes';
 const PRODUCTS_STORE = 'productos';
+const CONFIG_STORE = 'config_terminal';
 const VENDEDOR_STORE = 'vendedor';
 const HISTORIAL_STORE = 'historial_compras';
-const PEDIDOS_STORE = 'pedidos_locales';
+const PEDIDOS_STORE = 'pedidos_pendientes';
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -19,6 +20,10 @@ function openDb() {
       if (!db.objectStoreNames.contains(PRODUCTS_STORE)) {
         const pStore = db.createObjectStore(PRODUCTS_STORE, { keyPath: 'code' });
         pStore.createIndex('cachedAt', 'cachedAt');
+        pStore.createIndex('tarifaId', 'tarifaId');
+      }
+      if (!db.objectStoreNames.contains(CONFIG_STORE)) {
+        db.createObjectStore(CONFIG_STORE, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(VENDEDOR_STORE)) {
         db.createObjectStore(VENDEDOR_STORE, { keyPath: 'id' });
@@ -29,10 +34,10 @@ function openDb() {
         hStore.createIndex('productoCode', 'productoCode');
       }
       if (!db.objectStoreNames.contains(PEDIDOS_STORE)) {
-        const pStore = db.createObjectStore(PEDIDOS_STORE, { keyPath: 'id_local', autoIncrement: true });
+        const pStore = db.createObjectStore(PEDIDOS_STORE, { keyPath: 'id_local' });
         pStore.createIndex('estado', 'estado');
         pStore.createIndex('fecha', 'fecha');
-        pStore.createIndex('vendedorId', 'vendedorId');
+        pStore.createIndex('serie', 'serie');
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -122,15 +127,26 @@ export async function clearClientCache() {
   db.close();
 }
 
-// --- Productos ---
-export async function cacheProducts(products) {
-  if (!Array.isArray(products) || products.length === 0) return;
+// --- Configuración de terminal ---
+export async function getConfigTerminal() {
   const db = await openDb();
-  const now = Date.now();
+  try {
+    const tx = db.transaction(CONFIG_STORE, 'readonly');
+    return await requestToPromise(tx.objectStore(CONFIG_STORE).get('terminal'));
+  } catch (err) {
+    console.error('Error leyendo config_terminal:', err);
+    return null;
+  } finally {
+    db.close();
+  }
+}
+
+export async function saveConfigTerminal(cfg) {
+  if (!cfg) return;
+  const db = await openDb();
   await new Promise((resolve, reject) => {
-    const tx = db.transaction(PRODUCTS_STORE, 'readwrite');
-    const store = tx.objectStore(PRODUCTS_STORE);
-    products.filter(p => p?.code).forEach(p => store.put({ ...p, cachedAt: now }));
+    const tx = db.transaction(CONFIG_STORE, 'readwrite');
+    tx.objectStore(CONFIG_STORE).put({ id: 'terminal', ...cfg, updatedAt: Date.now() });
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
@@ -138,14 +154,56 @@ export async function cacheProducts(products) {
   db.close();
 }
 
-export async function allCachedProducts() {
+// --- Productos ---
+export async function cacheProducts(products, tarifaId) {
+  if (!Array.isArray(products) || products.length === 0) return;
+  const db = await openDb();
+  const now = Date.now();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(PRODUCTS_STORE, 'readwrite');
+    const store = tx.objectStore(PRODUCTS_STORE);
+    products.filter(p => p?.code).forEach(p => store.put({ ...p, tarifaId: tarifaId != null ? tarifaId : p.tarifaId, cachedAt: now }));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function allCachedProducts(tarifaId) {
   const db = await openDb();
   try {
     const tx = db.transaction(PRODUCTS_STORE, 'readonly');
-    return await requestToPromise(tx.objectStore(PRODUCTS_STORE).getAll());
+    const all = await requestToPromise(tx.objectStore(PRODUCTS_STORE).getAll());
+    if (tarifaId != null) {
+      return all.filter(p => Number(p.tarifaId) === Number(tarifaId));
+    }
+    return all;
   } catch (err) {
     console.error('Error leyendo productos de IndexedDB:', err);
     return [];
+  } finally {
+    db.close();
+  }
+}
+
+export async function updateCachedProduct(code, partialData) {
+  if (!code || !partialData) return;
+  const db = await openDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PRODUCTS_STORE, 'readwrite');
+      const store = tx.objectStore(PRODUCTS_STORE);
+      const req = store.get(code);
+      req.onsuccess = () => {
+        const existing = req.result;
+        if (existing) {
+          store.put({ ...existing, ...partialData, cachedAt: Date.now() });
+        }
+        resolve();
+      };
+      req.onerror = () => reject(req.error);
+    });
   } finally {
     db.close();
   }
@@ -259,47 +317,112 @@ export async function getHistorialByCliente(clienteCode) {
   }
 }
 
-// --- Pedidos locales ---
-export async function savePedidoLocal(pedido) {
+// --- Pedidos pendientes y locales ---
+export async function savePendingOrder(pedido) {
+  if (!pedido) return null;
+  const db = await openDb();
+  const id_local = pedido.id_local || `loc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const orderRecord = {
+    ...pedido,
+    id_local,
+    estado: pedido.estado || 'pendiente',
+    fecha: pedido.fecha || Date.now()
+  };
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(PEDIDOS_STORE, 'readwrite');
+    tx.objectStore(PEDIDOS_STORE).put(orderRecord);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+  return id_local;
+}
+
+export async function getPendingOrders() {
+  const db = await openDb();
+  try {
+    const tx = db.transaction(PEDIDOS_STORE, 'readonly');
+    const all = await requestToPromise(tx.objectStore(PEDIDOS_STORE).getAll());
+    // Solo pedidos estrictamente pendientes (nunca sincronizados)
+    return (all || [])
+      .filter(p => (p.estado === 'pendiente' || p.status === 'Pendiente sync') && p.estado !== 'sincronizado' && p.estado !== 'S' && p.status !== 'Sincronizado' && p.status !== 'Enviado')
+      .sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
+  } catch (err) {
+    console.error('Error leyendo pedidos pendientes:', err);
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+export async function getAllOrdersLocal() {
+  const db = await openDb();
+  try {
+    const tx = db.transaction(PEDIDOS_STORE, 'readonly');
+    const all = await requestToPromise(tx.objectStore(PEDIDOS_STORE).getAll());
+    return (all || []).sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+  } catch (err) {
+    console.error('Error leyendo todos los pedidos locales:', err);
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+export async function markOrderSynced(idLocal, idServidor) {
+  if (!idLocal) return;
   const db = await openDb();
   await new Promise((resolve, reject) => {
     const tx = db.transaction(PEDIDOS_STORE, 'readwrite');
-    tx.objectStore(PEDIDOS_STORE).put(pedido);
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
+    const store = tx.objectStore(PEDIDOS_STORE);
+    const req = store.get(idLocal);
+    req.onsuccess = () => {
+      const pedido = req.result;
+      if (pedido) {
+        pedido.estado = 'sincronizado';
+        pedido.status = 'Sincronizado';
+        pedido.readonly = true;
+        pedido.isHistorical = true;
+        pedido.id_servidor = idServidor || null;
+        pedido.syncedAt = Date.now();
+        store.put(pedido);
+      }
+      resolve();
+    };
+    req.onerror = () => reject(req.error);
   });
   db.close();
+}
+
+export async function deletePendingOrder(idLocal) {
+  if (!idLocal) return;
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(PEDIDOS_STORE, 'readwrite');
+    tx.objectStore(PEDIDOS_STORE).delete(idLocal);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function savePedidoLocal(pedido) {
+  return savePendingOrder(pedido);
 }
 
 export async function getPedidosByVendedor(vendedorId) {
   const db = await openDb();
   try {
     const tx = db.transaction(PEDIDOS_STORE, 'readonly');
-    const index = tx.objectStore(PEDIDOS_STORE).index('vendedorId');
-    const pedidos = await requestToPromise(index.getAll(vendedorId));
-    return pedidos.sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+    const all = await requestToPromise(tx.objectStore(PEDIDOS_STORE).getAll());
+    return (all || []).filter(p => !vendedorId || Number(p.id_vendedor || p.sellerId) === Number(vendedorId));
   } finally {
     db.close();
   }
 }
 
 export async function marcarPedidoEnviado(idLocal, datosServidor) {
-  const db = await openDb();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(PEDIDOS_STORE, 'readwrite');
-    const store = tx.objectStore(PEDIDOS_STORE);
-    const request = store.get(idLocal);
-    request.onsuccess = () => {
-      const pedido = request.result;
-      if (pedido) {
-        pedido.estado = 'enviado';
-        pedido.id_servidor = datosServidor?.id || null;
-        pedido.fecha_envio = Date.now();
-        store.put(pedido);
-      }
-      resolve();
-    };
-    request.onerror = () => reject(request.error);
-  });
-  db.close();
+  return markOrderSynced(idLocal, datosServidor?.id);
 }
